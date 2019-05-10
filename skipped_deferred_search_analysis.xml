@@ -656,7 +656,7 @@ status=skipped OR status=continued OR status=deferred savedsearch_name=$s3$ $fil
     <panel>
       <html>
                  <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
-                 <a target="_blank" href="testing_step2" class="btn btn-primary">continue investigation by looking at SHC status and configurations </a>
+                 <a target="_blank" href="shc_scheduler_analysis_detailed" class="btn btn-primary">continue investigation by looking at SHC status and configurations </a>
              </html>
     </panel>
   </row>
