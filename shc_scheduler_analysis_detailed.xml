@@ -1071,7 +1071,7 @@ where label == "$SHCMemberDrilldown$"
   </html>
       <chart>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group="dmc_searchheadclustergroup_shcluster1_new" sourcetype=scheduler  status=*  dispatch_time=* savedsearch_name=$ss1$
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" sourcetype=scheduler  status=*  dispatch_time=* savedsearch_name=$ss1$
 | eval runtime_delay= (dispatch_time-scheduled_time) | timechart avg(runtime_delay) as avg_runtime_delay avg(run_time) as avg_runtime max(run_time) as max_runtime by savedsearch_name useother=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
