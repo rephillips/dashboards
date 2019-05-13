@@ -1,5 +1,5 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
-  <label>SHC Scheduler Analysis Detailed</label>
+  <label>shc_scheduler_analysis_detailed</label>
   <search id="members_heartbeat_timeout_base" base="membersSnapshotSearch">
     <query>
           fields label, status, last_heartbeat, last_heartbeat_captain
@@ -586,7 +586,7 @@ where label == "$SHCMemberDrilldown$"
       <title>scheduled searches running over All Time</title>
       <single>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0   | search dispatch.earliest_time=0  | stats count</query>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0   dispatch.earliest_time="" OR dispatch.earliest_time=0  | rename eai:acl.* as *  | table title cron_schedule dispatch.earliest_time dispatch.latest_time app owner  | stats count</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -595,6 +595,7 @@ where label == "$SHCMemberDrilldown$"
         <option name="drilldown">all</option>
         <option name="rangeColors">["0x53a051","0xf1813f","0xd93f3c"]</option>
         <option name="rangeValues">[0,1]</option>
+        <option name="refresh.display">progressbar</option>
         <option name="trellis.enabled">0</option>
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
@@ -681,7 +682,7 @@ where label == "$SHCMemberDrilldown$"
       <table>
         <title>scheduled searches running over All Time</title>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0   | search dispatch.earliest_time="0"  | table title eai:acl.app eai:acl.owner cron_schedule | rename eai:acl.app as "app" eai:acl.owner as "owner"</query>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0   dispatch.earliest_time="" OR dispatch.earliest_time=0  | rename eai:acl.* as *  | table title cron_schedule dispatch.earliest_time dispatch.latest_time app owner</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -690,6 +691,7 @@ where label == "$SHCMemberDrilldown$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -929,6 +931,73 @@ where label == "$SHCMemberDrilldown$"
   </row>
   <row>
     <panel>
+      <title>scheduled search concurrency configured for each minute in the hour</title>
+      <chart>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$
+| regex cron_schedule="\*\s\*\s\*\s\*$$"
+| search is_scheduled=1 disabled=0
+| eval cron_schedule=if(title="test1 Clone","1,12,24,36,48 * * * *",cron_schedule)
+| fields title cron_schedule
+| rex field=cron_schedule "^(?&lt;minute_position&gt;(?&lt;first_minute&gt;[^-\/\s,]+)(?:[^\/]*\/(?&lt;divisor&gt;\S+))?\S*)"
+| eval first_minute=case(match(minute_position,"^\*"),"0",match(cron_schedule,","),split(minute_position,","),1=1,first_minute)
+| mvexpand first_minute
+| eval divisor=if(match(minute_position,"\*$$"),"1",divisor)
+| eval multiplier=round(60/divisor,2)
+| eval trimmer=floor(60-multiplier)
+| eval rex="^.{".trimmer."}(.*)"
+| eval job_run_count=split(replace("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||",rex,"\1"),"")
+| fillnull value=" | " job_run_count
+| eval count=1
+| mvexpand job_run_count
+| streamstats sum(count) AS count by title
+| eval scheduled_min=if(isnull(multiplier),first_minute,floor((60/multiplier)*(count-1)+first_minute)),scheduled_min=if(len(scheduled_min)=1,"0".scheduled_min,scheduled_min)
+| where scheduled_min &lt; 360
+| stats count(cron_schedule) by scheduled_min | join splunk_server [| rest splunk_server=$captain_name$ "/services/server/status/limits/search-concurrency?cluster_wide_quota=1"
+              | stats max(max_hist_scheduled_searches) as max_clusterwide_scheduler_concurrency ]</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">minute of the hour</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">max_clusterwide_scheduler_concurrency</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>Captain Computed Concurrency (metrics.log) vs Concurrent Running Scheduled Search Processes (peak_scheduler_concurrency) (introspection)</title>
       <chart>
         <search>
@@ -1071,7 +1140,7 @@ where label == "$SHCMemberDrilldown$"
   </html>
       <chart>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" sourcetype=scheduler  status=*  dispatch_time=* savedsearch_name=$ss1$
+          <query>index=_internal search_group=dmc_group_search_head search_group="dmc_searchheadclustergroup_shcluster1_new" sourcetype=scheduler  status=*  dispatch_time=* savedsearch_name=$ss1$
 | eval runtime_delay= (dispatch_time-scheduled_time) | timechart avg(runtime_delay) as avg_runtime_delay avg(run_time) as avg_runtime max(run_time) as max_runtime by savedsearch_name useother=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
@@ -1116,7 +1185,7 @@ where label == "$SHCMemberDrilldown$"
     <panel>
       <html>
                  <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
-                 <a target="_blank" href="indexing_performance" class="btn btn-primary">continue investigation by looking at Indexer Performance </a>
+                 <a target="_blank" href="Indexing_Performance" class="btn btn-primary">continue investigation by looking at Indexer Performance </a>
              </html>
     </panel>
   </row>
