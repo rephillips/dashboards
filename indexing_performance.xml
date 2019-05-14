@@ -879,7 +879,10 @@
       </input>
       <chart>
         <search>
-          <query>index=_introspection search_group="dmc_group_indexer" host=$splunk_server$ source=*resource_usage.log* data.search_props.mode="*"  | timechart  dc(data.search_props.sid) by data.search_props.$split$</query>
+          <query>index=_introspection search_group="dmc_group_indexer" host=$splunk_server$ source=*resource_usage.log* data.search_props.mode="*"  | bin _time span=10s
+                        | stats dc(data.search_props.sid) AS distinct_search_count by _time data.search_props.$split$
+                        | timechart bins=200 max(distinct_search_count) AS
+                        "max of search concurrency" by data.search_props.$split$</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -918,7 +921,10 @@
       <title>distinct count of RT searches running</title>
       <chart>
         <search>
-          <query>index=_introspection search_group="dmc_group_indexer" host=$splunk_server$ source=*resource_usage.log* component=PerProcess "data.search_props.sid"=* "data.search_props.mode"=RT* | timechart  dc(data.search_props.sid) by host useother=f limit=0</query>
+          <query>index=_introspection search_group="dmc_group_indexer" host=$splunk_server$ source=*resource_usage.log* component=PerProcess "data.search_props.sid"=* "data.search_props.mode"=RT* | bin _time span=10s
+                        | stats dc(data.search_props.sid) AS distinct_search_count by _time 
+                        | timechart bins=200 max(distinct_search_count) AS
+                        "max rt search concurrency"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
