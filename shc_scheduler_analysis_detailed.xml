@@ -718,19 +718,19 @@ where label == "$SHCMemberDrilldown$"
       </input>
       <chart>
         <title>shc captaincy timeline</title>
-        <search>
-          <query>`dmc_set_index_internal` sourcetype=splunkd group=searchscheduler search_group=dmc_group_search_head search_group="$group$"
-| timechart $span1$ sum(delegated) as delegated by host</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
         <search type="annotation">
           <query>`dmc_set_index_internal` search_group=$group$ sourcetype=splunkd component=Metrics group=captainstability upgrades_to_captain=1 | eval msg="Became SHC Captain"
 | eval annotation_label = msg
 | eval annotation_category = host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
+        </search>
+        <search>
+          <query>`dmc_set_index_internal` sourcetype=splunkd group=searchscheduler search_group=dmc_group_search_head search_group="$group$"
+| timechart $span1$ sum(delegated) as delegated by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -1000,8 +1000,7 @@ where label == "$SHCMemberDrilldown$"
     </panel>
   </row>
   <row>
-      <panel depends="$c1$">
- 
+    <panel depends="$c1$">
       <title>reduce user job quota script generator</title>
       <table>
         <search>
@@ -1025,8 +1024,7 @@ where label == "$SHCMemberDrilldown$"
         <option name="wrap">true</option>
       </table>
     </panel>
-      <panel depends="$c1$">
-
+    <panel depends="$c1$">
       <title>shuffle cron schedule script generator</title>
       <table>
         <search>
@@ -1073,7 +1071,7 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
-           <html>
+      <html>
     <a data-unset-token="c1">Close this panel</a>
   </html>
     </panel>
@@ -1187,7 +1185,6 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
         <choice value="*">all</choice>
         <choice value="skipped">skipped</choice>
         <choice value="deferred">deferred</choice>
-        <default>*</default>
         <prefix>status=</prefix>
         <delimiter> OR status=</delimiter>
       </input>
