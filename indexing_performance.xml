@@ -73,7 +73,77 @@
         </condition>
       </change>
     </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliestTime>-4h@m</earliestTime>
+        <latestTime>now</latestTime>
+      </default>
+    </input>
   </fieldset>
+  <row>
+    <panel>
+      <title>Transparent Huge Pages &amp; Ulimits</title>
+      <table>
+        <search>
+          <query>| rest /services/server/sysinfo splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$   | table splunk_server numberOfVirtualCores  physicalMemoryMB ulimits.open_files transparent_hugepages.defrag transparent_hugepages.enabled transparent_hugepages.effective_state cpu_arch os_version</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Index retention</title>
+      <table>
+        <search>
+          <query>| rest /services/data/indexes splunk_server=$splunk_server$ | where disabled = 0  | eval currentDBSizeGB = round( currentDBSizeMB / 1024) | where currentDBSizeGB &gt; 0 | table splunk_server title  minTime maxTime currentDBSizeGB totalEventCount  maxDataSize maxHotBuckets maxWarmDBCount frozenTimePeriodInSecs  maxTotalDataSizeMB   processTrackerServiceInterval maxRunningProcessGroups homePath_expanded coldPath_expanded summaryHomePath_expanded tstatsHomePath_expanded coldToFrozenDir  | addcoltotals maxTotalDataSizeMB</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>active indexes</title>
+      <table>
+        <search>
+          <query>| rest /services/data/indexes splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ | where disabled = 0  | eval currentDBSizeGB = round( currentDBSizeMB / 1024) | where currentDBSizeGB &gt; 0 | stats values(title) as index_values dc(title) as "index_count" by splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
   <row>
     <panel>
       <html>
@@ -132,6 +202,22 @@
   <row>
     <panel rejects="$historical$" depends="$parallel_pipeline_enabled$">
       <title>Splunk Enterprise Parallel Data Pipelines</title>
+      <input depends="$parallel_pipeline_enabled$" type="dropdown" searchWhenChanged="true" token="log_pipe_scope">
+        <label>Pipeline Set</label>
+        <showClearButton>false</showClearButton>
+        <default>*</default>
+        <search>
+          <query>
+            `dmc_set_index_internal` host=$host$ source="*metrics.log" sourcetype=splunkd group=pipeline 
+            | stats count by ingest_pipe
+          </query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <fieldForLabel>ingest_pipe</fieldForLabel>
+        <fieldForValue>ingest_pipe</fieldForValue>
+        <choice value="*">All</choice>
+      </input>
       <table>
         <search base="pipeline_queue_api_base">
           <query>
@@ -151,29 +237,6 @@
   <row>
     <panel rejects="$snapshot$">
       <title>Historical Charts</title>
-      <input type="time" searchWhenChanged="true" token="time">
-        <label>Time Range:</label>
-        <default>
-          <earliestTime>-4h@m</earliestTime>
-          <latestTime>now</latestTime>
-        </default>
-      </input>
-      <input depends="$parallel_pipeline_enabled$" type="dropdown" searchWhenChanged="true" token="log_pipe_scope">
-        <label>Pipeline Set</label>
-        <showClearButton>false</showClearButton>
-        <default>*</default>
-        <search>
-          <query>
-            `dmc_set_index_internal` host=$host$ source="*metrics.log" sourcetype=splunkd group=pipeline 
-            | stats count by ingest_pipe
-          </query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-        </search>
-        <fieldForLabel>ingest_pipe</fieldForLabel>
-        <fieldForValue>ingest_pipe</fieldForValue>
-        <choice value="*">All</choice>
-      </input>
     </panel>
   </row>
   <row>
@@ -303,7 +366,7 @@
     </panel>
   </row>
   <row>
-    <panel>
+    <panel depends="$results_available$">
       <title>Blocked Queue Events</title>
       <chart>
         <search>
@@ -311,6 +374,14 @@
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <done>
+            <condition match="$job.resultCount$ =0">
+              <set token="results_available">true</set>
+            </condition>
+            <condition>
+              <unset token="results_available"></unset>
+            </condition>
+          </done>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -1007,28 +1078,6 @@
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>ulimits &amp; THP</title>
-      <input type="time" token="time2" searchWhenChanged="true">
-        <label></label>
-        <default>
-          <earliest>-24h@h</earliest>
-          <latest>now</latest>
-        </default>
-      </input>
-      <table>
-        <search>
-          <query>index=_internal search_group="dmc_group_indexer" host=$splunk_server$ source=*splunkd.log* "open files" OR transparent OR "CPU Cores"  | table _time host  _raw</query>
-          <earliest>$time2.earliest$</earliest>
-          <latest>$time2.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="drilldown">none</option>
-        <option name="refresh.display">progressbar</option>
-      </table>
     </panel>
   </row>
   <row>
