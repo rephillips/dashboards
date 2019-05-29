@@ -167,7 +167,7 @@
       <title>"bundle validation in progress"</title>
       <chart>
         <search>
-          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" "Bundle validation is in progress " | timechart  span=1m count as "bundle validation in progress"</query>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" NOT DispatchManager "Bundle validation is in progress " | timechart  span=1m count as "bundle validation in progress"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -268,7 +268,7 @@
       <chart>
         <title>$bundle$</title>
         <search>
-          <query>index=_internal search_group="$group$" source=*splunkd.log* "Informed bundle success status to the master for bundle" $bundle$  | eval host_bundle=host."::".id | timechart span=5m count by host_bundle</query>
+          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager "Informed bundle success status to the master for bundle" $bundle$  | eval host_bundle=host."::".id | timechart span=5m count by host_bundle</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -312,7 +312,7 @@
       <chart>
         <title>$bundle$</title>
         <search>
-          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$"  "Bundle validation success reported by" | rename bundleid as id| search $bundle$  |timechart span=1m count as "bundle validation success msg" by peer_name</query>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" NOT DispatchManager  "Bundle validation success reported by" | rename bundleid as id| search $bundle$  |timechart span=1m count as "bundle validation success msg" by peer_name</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -357,7 +357,7 @@
       <title>Peer applies bundle</title>
       <chart>
         <search>
-          <query>index=_internal  search_group="$group$" source=*splunkd.log*  CMSlave "Moving the downloaded bundle" "to slave-apps" | timechart span=5m count by host</query>
+          <query>index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager  CMSlave "Moving the downloaded bundle" "to slave-apps" | timechart span=5m count by host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -402,7 +402,7 @@
       <title>Splunk Restart timeline for $group$</title>
       <chart>
         <search>
-          <query>index=_internal   search_group="$group$" source=*splunkd.log* "My GUID" | timechart span=5m count by host</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart span=5m count by host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
