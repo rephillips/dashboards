@@ -299,6 +299,51 @@
   </row>
   <row>
     <panel>
+      <title>Peer applies bundle</title>
+      <chart>
+        <search>
+          <query>index=_internal  search_group="$group$" source=*splunkd.log*  CMSlave "Moving the downloaded bundle" "to slave-apps" | timechart span=5m count by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>Cluster Bundle Endpoints (execute commands on the cluster master)</title>
       <html>
        <p>
@@ -321,15 +366,33 @@
        <p>
           <b>example:</b>
         </p>
-        <p>curl -k -u admin:pass https://127.0.0.1:8089/services/cluster/master/control/default/cancel_bundle_push -X POST</p><br/>
+        <p>curl -k -u admin:pass https://127.0.0.1:8089/services/cluster/master/control/default/cancel_bundle_push -X POST</p>
+        <br/>
         
-        <p><b>Use the CLI to show cluster bundle status:</b></p>
+        <p>
+          <b>Use the CLI to show cluster bundle status:</b>
+        </p>
          <p>./splunk show cluster-bundle-status</p>
-        <p><b>Use the CLI to validate the bundle and check restart:</b></p>
+        <p>
+          <b>Use the CLI to validate the bundle and check restart:</b>
+        </p>
         <p>./splunk validate cluster-bundle --check-restart</p>
-        <p><b>Use the CLI to apply the bundle to the peers</b></p>
+        <p>
+          <b>Use the CLI to apply the bundle to the peers</b>
+        </p>
         <p>./splunk apply cluster-bundle</p>
        
+        <p><b>index cluster bundle operation flow on peer:</b></p>
+        <p>1.) Download the bundle</p>
+        <p>2.) Validate the bundle</p>
+        <p>3.) Inform validation status to cluster master</p>
+        <p>4.) If master tells to apply</p>
+        <p>5.) Apply the bundle</p>
+        <p>6.) Inform master if rolling restart is necessary for bundle application</p>
+        
+        
+        
+        
         
         <br/>
          <p>
