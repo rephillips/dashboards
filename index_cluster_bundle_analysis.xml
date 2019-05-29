@@ -1,0 +1,297 @@
+<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
+  <label>index cluster bundle analysis</label>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="group">
+      <label>Index Cluster</label>
+      <showClearButton>false</showClearButton>
+      <search>
+        <query>| `dmc_get_indexer_cluster_groups`</query>
+      </search>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-4h@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>cluster master info</title>
+      <table>
+        <search>
+          <query>| rest /services/cluster/master/info splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$"| table splunk_server active_bundle.bundle_path active_bundle.checksum active_bundle.timestamp apply_bundle_status.awaiting_bundle_status_from_peers apply_bundle_status.status last_dry_run_bundle.bundle_path last_dry_run_bundle.checksum last_dry_run_bundle.timestamp last_validated_bundle.bundle_path last_validated_bundle.checksum last_validated_bundle.is_valid_bundle last_validated_bundle.timestamp latest_bundle.bundle_path latest_bundle.checksum latest_bundle.timestamp maintenance_mode multisite previous_active_bundle.bundle_path previous_active_bundle.checksum previous_active_bundle.timestamp | convert ctime(*.timestamp) as *.timestamp| rename splunk_server as Instance</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="cmaster">$click.name$</set>
+        </drilldown>
+      </table>
+      <html>
+        <p>Click on instance name above to see more detail.</p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$cmaster$">
+      <title>cluster master status</title>
+      <html>
+    <a data-unset-token="cmaster">Close this panel</a>
+  </html>
+      <table>
+        <search>
+          <query>| rest /services/cluster/master/status splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$cmaster$">
+      <title>cluster master server.conf</title>
+      <table>
+        <title>[clustering]</title>
+        <search>
+          <query>| rest /services/configs/conf-server/clustering splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$" | transpose</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>cluster peers</title>
+      <table>
+        <search>
+          <query>| rest /services/cluster/master/peers splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$" | table label site splunk_version status bucket_count title *bundle* | rename label as Instance title as GUID | fillnull value=null</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>cluster-bundle-status</title>
+      <table>
+        <search>
+          <query>| rest /services/cluster/master/peers splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$" |stats values(label) as Instance dc(label) as count by apply_bundle_status.status | rename apply_bundle_status.status as cluster_bundle_status</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>"bundle validation in progress"</title>
+      <chart>
+        <search>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" "Bundle validation is in progress " | timechart  span=1m count as "bundle validation in progress"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>count of peers that downloaded bundle from CM</title>
+        <search>
+          <query>index=_internal  search_group="$group$" source=*splunkd_access.log* "GET /services/streams/clusterbundles?latest_bundle" OR "POST /services/cluster/master/control/control/apply" NOT 127.0.0.1 | timechart span=5m dc(clientip) as "count of peers that downloaded bundle from CM"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>cluster master receipt of "bundle validation success" msg from peers</title>
+      <chart>
+        <search>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$"  "Bundle validation success reported by"  |timechart span=1m count as "bundle validation success msg" by peer_name</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Cluster Bundle Endpoints (execute commands on the cluster master)</title>
+      <html>
+       <p>
+          <b>Pushes a bundle:</b>
+        </p>
+       <p>curl -k -u admin:pass https://host:mPort/services/cluster/master/control/default/apply -X POST</p>
+       <p>
+          <b>Cancels and resets the bundle push operation. Use this endpoint when the cluster master does not receive a validation response from the cluster peer due to an error:</b>
+        </p>
+       <p>curl -k -u admin:pass https://host:mPort/services/cluster/master/control/default/cancel_bundle_push -X POST</p>
+       <p>
+          <b>Roll a bundle back to the previously active bundle:</b>
+        </p>
+       <p>curl -k -u admin:pass https://host:mPort/services/cluster/master/control/default/rollback -X POST</p>
+       <p>
+          <b>Tests if the bundle in etc/master-apps passes validation. Optionally, tests if the bundle will trigger an indexer restart:</b>
+        </p>
+       <p>curl -k -u admin:pass https://host:mPort/services/cluster/master/control/default/validate_bundle -d check-restart=true -X POST</p>
+        <br/>
+       <p>
+          <a href="https://docs.splunk.com/Documentation/Splunk/7.2.6/Indexer/Configurationbundleissues" target="_blank" class="external">Learn More</a>
+        </p>
+      </html>
+    </panel>
+  </row>
+</form>
