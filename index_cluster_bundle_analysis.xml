@@ -254,10 +254,65 @@
   </row>
   <row>
     <panel>
+      <input type="text" token="bundle" searchWhenChanged="true">
+        <label>bundle filter</label>
+        <default>*</default>
+        <prefix>id=</prefix>
+        <initialValue>*</initialValue>
+      </input>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>peer informed bundle validation success status to the master (peer::bundle)</title>
+      <chart>
+        <title>$bundle$</title>
+        <search>
+          <query>index=_internal search_group="$group$" source=*splunkd.log* "Informed bundle success status to the master for bundle" $bundle$  | eval host_bundle=host."::".id | timechart span=5m count by host_bundle</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
       <title>cluster master receipt of "bundle validation success" msg from peers</title>
       <chart>
+        <title>$bundle$</title>
         <search>
-          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$"  "Bundle validation success reported by"  |timechart span=1m count as "bundle validation success msg" by peer_name</query>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$"  "Bundle validation success reported by" | rename bundleid as id| search $bundle$  |timechart span=1m count as "bundle validation success msg" by peer_name</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -344,6 +399,51 @@
   </row>
   <row>
     <panel>
+      <title>Splunk Restart timeline for $group$</title>
+      <chart>
+        <search>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* "My GUID" | timechart span=5m count by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>Cluster Bundle Endpoints (execute commands on the cluster master)</title>
       <html>
        <p>
@@ -382,9 +482,11 @@
         </p>
         <p>./splunk apply cluster-bundle</p>
        
-        <p><b>index cluster bundle operation flow on peer:</b></p>
-        <p>1.) Download the bundle</p>
-        <p>2.) Validate the bundle</p>
+        <p>
+          <b>index cluster bundle operation flow on peer:</b>
+        </p>
+        <p>1.) Download the bundle from cluster master</p>
+        <p>2.) Untar and validate the bundle</p>
         <p>3.) Inform validation status to cluster master</p>
         <p>4.) If master tells to apply</p>
         <p>5.) Apply the bundle</p>
