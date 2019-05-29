@@ -14,7 +14,7 @@
     <input type="time" token="time" searchWhenChanged="true">
       <label></label>
       <default>
-        <earliest>-4h@m</earliest>
+        <earliest>-24h@h</earliest>
         <latest>now</latest>
       </default>
     </input>
@@ -103,9 +103,39 @@
         </search>
         <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="peer">$click.value$</set>
+        </drilldown>
+      </table>
+      <html>
+        <p>Click on instance name above to see more detail.</p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$peer$">
+      <title>$peer$ server.conf</title>
+      <title>$peer$ server.conf</title>
+      <html>
+    <a data-unset-token="peer">Close this panel</a>
+  </html>
+      <table>
+        <title>[clustering]</title>
+        <search>
+          <query>| rest /services/configs/conf-server/clustering splunk_server=$peer$ | transpose</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -158,7 +188,7 @@
         <option name="charting.chart.bubbleMaximumSize">50</option>
         <option name="charting.chart.bubbleMinimumSize">10</option>
         <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.nullValueMode">connect</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
         <option name="charting.chart.stackMode">default</option>
@@ -287,10 +317,25 @@
           <b>Tests if the bundle in etc/master-apps passes validation. Optionally, tests if the bundle will trigger an indexer restart:</b>
         </p>
        <p>curl -k -u admin:pass https://host:mPort/services/cluster/master/control/default/validate_bundle -d check-restart=true -X POST</p>
-        <br/>
+       
        <p>
+          <b>example:</b>
+        </p>
+        <p>curl -k -u admin:pass https://127.0.0.1:8089/services/cluster/master/control/default/cancel_bundle_push -X POST</p><br/>
+        
+        <p><b>Use the CLI to show cluster bundle status:</b></p>
+         <p>./splunk show cluster-bundle-status</p>
+        <p><b>Use the CLI to validate the bundle and check restart:</b></p>
+        <p>./splunk validate cluster-bundle --check-restart</p>
+        <p><b>Use the CLI to apply the bundle to the peers</b></p>
+        <p>./splunk apply cluster-bundle</p>
+       
+        
+        <br/>
+         <p>
           <a href="https://docs.splunk.com/Documentation/Splunk/7.2.6/Indexer/Configurationbundleissues" target="_blank" class="external">Learn More</a>
         </p>
+        
       </html>
     </panel>
   </row>
