@@ -38,8 +38,8 @@
   </fieldset>
   <row>
     <panel>
+      <title>1.) Are searches being skipped or deferred</title>
       <table>
-        <title>1.) Are searches being skipped or deferred</title>
         <search>
           <query>index=_internal source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
 $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) | chart  count sparkline(count, 1m) as trend by status  | sort -count</query>
@@ -51,17 +51,19 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
         <option name="count">10</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="wrap">true</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"skipped":#ffb3b3,"delegated_remote_error":#ffb3b3,"completed":	#ccffcc,"deferred":#ffd966}</colorPalette>
+        </format>
         <format field="trend" type="sparkline">
-          <option name="type">bar</option>
+          <option name="type">line</option>
+          <option name="lineColor">#ff9999</option>
           <option name="height">30px</option>
+          <option name="fillColor">#ffe699</option>
           <option name="colorMap">
-            <option name="2000:">#5379AF</option>
-            <option name=":1999">#9ac23c</option>
+            <option name="2000:">#ff9999</option>
           </option>
-          <option name="barWidth">7px</option>
         </format>
         <drilldown>
           <set token="s1">$row.&lt;fieldname&gt;$</set>
@@ -79,7 +81,7 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
         <title>search status timeline</title>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$" $filter$
-(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) | timechart count  by status</query>
+(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) | timechart count  by status usenull=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -125,14 +127,14 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
   <row>
     <panel depends="$s1$">
       <html>
-    <a data-unset-token="s1">Collapse</a>
+    <a data-unset-token="s1">Close this panel</a>
   </html>
     </panel>
   </row>
   <row>
     <panel>
+      <title>2.) Why are searches being skipped or deferred</title>
       <table>
-        <title>2.) Why are searches being skipped or deferred</title>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
 (status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) $filter$ | chart count sparkline(count, 1m) as trend by  reason | sort -count</query>
@@ -141,25 +143,28 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
         </search>
         <!-- Set span for each sparkline datapoint to be 1 hour -->
         <!-- Set sparkline options here; make sure that field matches field name of the search results -->
-        <option name="count">5</option>
+        <option name="count">3</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="wrap">true</option>
         <format field="trend" type="sparkline">
-          <option name="type">bar</option>
-          <option name="height">40px</option>
+          <option name="type">line</option>
+          <option name="lineColor">#ff9999</option>
+          <option name="height">30px</option>
+          <option name="fillColor">#ffe699</option>
           <option name="colorMap">
-            <option name="2000:">#C33D48</option>
-            <option name=":1999">#C33D48</option>
+            <option name="2000:">#ff9999</option>
           </option>
-          <option name="barWidth">7px</option>
         </format>
         <drilldown>
           <set token="s2">$row.&lt;fieldname&gt;$</set>
         </drilldown>
       </table>
+      <html>
+        <p>Click reason above to see more details.</p>
+       
+      </html>
     </panel>
   </row>
   <row>
@@ -170,7 +175,7 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
       <chart>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
-status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error  $filter$ | timechart count  by reason</query>
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error  $filter$ | timechart limit=0 count  by reason usenull=f</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -211,16 +216,23 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
           <set token="r1">$click.name2$</set>
         </drilldown>
       </chart>
+      <html>
+       <p>Click reason to see more details.</p>
+       
+      </html>
     </panel>
     <panel depends="$r1$">
       <html>
     <a data-unset-token="r1">Close this panel</a>
-  </html>
+  
+        
+       
+      </html>
       <chart>
         <title>$r1$</title>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
-status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ reason="$r1$" | timechart count  by savedsearch_name limit=0</query>
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ reason="$r1$" | timechart count  by savedsearch_name limit=0 usenull=f</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -261,6 +273,9 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
           <set token="r2">$click.name2$</set>
         </drilldown>
       </chart>
+      <html>
+        <p>Click search name to see more details.</p>
+      </html>
     </panel>
   </row>
   <row>
@@ -293,6 +308,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
   </row>
   <row>
     <panel>
+      <title>3.) Which searches are being skipped or deferred</title>
       <input type="multiselect" token="ss_name" searchWhenChanged="true">
         <label>savedsearch_name</label>
         <choice value="*">all</choice>
@@ -310,7 +326,6 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
         <initialValue>*</initialValue>
       </input>
       <table>
-        <title>3.) Which searches are being skipped or deferred</title>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
 status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ $ss_name$ | chart count sparkline(count, 1m) as trend by savedsearch_name  | sort -count</query>
@@ -319,20 +334,19 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
         </search>
         <!-- Set span for each sparkline datapoint to be 1 hour -->
         <!-- Set sparkline options here; make sure that field matches field name of the search results -->
-        <option name="count">5</option>
+        <option name="count">3</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="wrap">true</option>
         <format field="trend" type="sparkline">
-          <option name="type">bar</option>
-          <option name="height">40px</option>
+          <option name="type">line</option>
+          <option name="lineColor">#ff9999</option>
+          <option name="height">30px</option>
+          <option name="fillColor">#ffe699</option>
           <option name="colorMap">
-            <option name="3000:">#FE9A2E</option>
-            <option name=":3001">#C33D48</option>
+            <option name="2000:">#ff9999</option>
           </option>
-          <option name="barWidth">7px</option>
         </format>
         <drilldown>
           <set token="s3">$click.value$</set>
@@ -346,7 +360,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
         <title>reasons $s3$ has been skipped or deferred</title>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
-status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error savedsearch_name=$s3$ $filter$ | timechart count  by reason limit=0</query>
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error savedsearch_name=$s3$ $filter$ | timechart count  by reason limit=0 usenull=f</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -391,7 +405,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
       <chart>
         <title>$s3$ has been skipped or deferred for the following scheduled times</title>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$ savedsearch_name="$s3$"   | eval delay=(dispatch_time-scheduled_time) | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ savedsearch_name="$s3$"  | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed | search status!=success | eval _time=scheduled_time | timechart span=1m count by status</query>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$ savedsearch_name="$s3$"   | eval delay=(dispatch_time-scheduled_time) | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ savedsearch_name="$s3$"  | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed | search status!=success | eval _time=scheduled_time | timechart span=1m count by status limit=0 usenull=f</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -443,11 +457,10 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">100</option>
+        <option name="count">1</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -568,28 +581,30 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
         <option name="trellis.size">medium</option>
       </chart>
       <html>
-    <a data-unset-token="s3">Collapse</a>
+    <a data-unset-token="s3">Close this panel</a>
   </html>
     </panel>
   </row>
   <row>
     <panel>
+      <title>4.) Overall Impact of unique searches in the last $time.earliest$</title>
       <table>
-        <title>4.) Overall Impact of unique searches in the last $time.earliest$</title>
         <search>
           <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$ savedsearch_name=*  | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log* $filter$  status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error savedsearch_name=* | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion   | dedup savedsearch_name | stats dc(savedsearch_name) as "unique searches impacted" by status | sort -"unique searches impacted"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">100</option>
-        <option name="dataOverlayMode">heatmap</option>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"skipped":#ffb3b3,"delegated_remote_error":#ffb3b3,"completed":	#ccffcc,"deferred":#ffd966}</colorPalette>
+        </format>
         <drilldown>
           <set token="s4">$click.value$</set>
         </drilldown>
@@ -605,7 +620,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
       <chart>
         <title>searches  $s4$ past their scheduled_time</title>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$  status=$s4$   | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   $filter$ status=$s4$    | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion  | eval _time=scheduled_time | timechart  count by status</query>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$  status=$s4$   | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   $filter$ status=$s4$    | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion  | eval _time=scheduled_time | timechart  count by status limit=0 usenull=f</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -656,17 +671,16 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">10</option>
+        <option name="count">1</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
       <html>
-    <a data-unset-token="s4">Collapse</a>
+    <a data-unset-token="s4">Close this panel</a>
   </html>
     </panel>
   </row>
