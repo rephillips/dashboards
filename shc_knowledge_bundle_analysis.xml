@@ -1,0 +1,581 @@
+<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
+  <label>SHC: Search Knowledge Bundle</label>
+  <search id="members_heartbeat_timeout_base" base="membersSnapshotSearch">
+    <query>
+          fields label, status, last_heartbeat, last_heartbeat_captain
+          | join label type=outer [
+            | rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head /services/configs/conf-server/shclustering
+            | fields splunk_server, heartbeat_timeout
+            | rename splunk_server as label
+          ]
+          | where status != "Up" OR (last_heartbeat_captain - last_heartbeat) &gt; heartbeat_timeout
+        </query>
+    <preview>
+      <condition match="$job.resultCount$ &gt; 0">
+        <set token="member_heartbeat_text_unhealthy">There are members in this cluster that do not have a healthy heartbeat status.</set>
+      </condition>
+      <condition match="$job.resultCount$ = 0">
+        <set token="member_heartbeat_text_healthy">All members in this cluster have a healthy heartbeat status.</set>
+      </condition>
+    </preview>
+  </search>
+  <search id="member_peer_consistency_base">
+    <query>
+          | rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head /services/search/distributed/peers
+          | fields splunk_server, peerName
+          | stats values(peerName) as peers by splunk_server
+          | nomv peers
+          | stats values(splunk_server) AS search_heads by peers
+          | makemv peers
+          | fields search_heads peers
+          | rename search_heads as "Search Head Cluster Member", peers as "Search Peer List"
+        </query>
+    <preview>
+      <condition match="$job.resultCount$ &gt; 1">
+        <set token="member_peer_inconsistency_text">The list of distributed search peers is inconsistent among cluster members. This could result in inconsistent search results within the search head cluster.</set>
+      </condition>
+    </preview>
+  </search>
+  <search base="membersSnapshotSearch">
+    <query>
+          where total_no_shared_common_baseline+total_unable_to_connect &gt; 0
+        </query>
+    <preview>
+      <condition match="$job.resultCount$ &gt; 0">
+        <set token="common_baseline_text_unhealthy">There are members in this cluster that do not share a common baseline. Action may be required.</set>
+        <unset token="common_baseline_text_healthy"></unset>
+      </condition>
+      <condition match="$job.resultCount$ = 0">
+        <set token="common_baseline_text_healthy">All members in this cluster share a common baseline.</set>
+        <unset token="common_baseline_text_unhealthy"></unset>
+      </condition>
+    </preview>
+  </search>
+  <search id="snapshot_search_concurrency_base">
+    <query>
+          | rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head /services/server/status/resource-usage/splunk-processes
+          | search search_props.role="head"
+          | dedup search_props.sid
+        </query>
+  </search>
+  <search id="search_concurrency_vs_limits_base" base="snapshot_search_concurrency_base">
+    <query>
+            stats count(eval(('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration" OR 'search_props.type'=="ad-hoc") AND ('search_props.mode'=="historical" OR 'search_props.mode'=="historical batch"))) as count_total_hist,
+            count(eval(('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration" OR 'search_props.type'=="ad-hoc") AND ('search_props.mode'=="RT" OR 'search_props.mode'=="RT indexed"))) as count_total_rt,
+            count(eval(('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration") AND ('search_props.mode'=="historical" OR 'search_props.mode'=="historical batch"))) as count_hist_scheduled_search,
+            count(eval(('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration") AND ('search_props.mode'=="RT" OR 'search_props.mode'=="RT indexed"))) as count_rt_scheduled_search,
+            count(eval(('search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration"))) as count_auto_summary_search
+            | eval count_total_adhoc_scheduled_search = count_total_hist + count_total_rt
+            | eval count_total_scheduled_search = count_hist_scheduled_search + count_rt_scheduled_search
+            | eval dummy_key = "dummy_key"
+            | fields count_total_hist, count_hist_scheduled_search,
+                     count_total_rt, count_rt_scheduled_search,
+                     count_auto_summary_search,
+                     count_total_adhoc_scheduled_search, count_total_scheduled_search,
+                     dummy_key
+            | join dummy_key type=outer [
+              | rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head "/services/server/status/limits/search-concurrency?cluster_wide_quota=1"
+              | stats max(max_hist_searches) as max_hist_searches, max(max_hist_scheduled_searches) as max_hist_scheduled_searches, max(max_rt_searches), as max_rt_searches, max(max_rt_scheduled_searches) as max_rt_scheduled_searches, max(max_auto_summary_searches) as max_auto_summary_searches
+              | eval dummy_key = "dummy_key"
+              | fields max_hist_searches, max_hist_scheduled_searches,
+                  max_rt_searches, max_rt_scheduled_searches,
+                  max_auto_summary_searches,
+                  dummy_key
+            ]
+          </query>
+    <preview>
+      <eval token="count_total_adhoc_scheduled_search">if(isnotnull('result.count_total_adhoc_scheduled_search'), 'result.count_total_adhoc_scheduled_search', 0)</eval>
+      <eval token="count_total_scheduled_search">if(isnotnull('result.count_total_scheduled_search'), 'result.count_total_scheduled_search', 0)</eval>
+    </preview>
+  </search>
+  <search id="shcSearchConBase">
+    <query>
+        `dmc_set_index_introspection` search_group=dmc_group_search_head search_group="$group$" sourcetype=splunk_resource_usage ((component=PerProcess data.search_props.sid::*) OR component=Hostwide)
+        | `dmc_rename_introspection_fields`
+        | `dmc_set_bin`
+        | stats dc(sid) AS distinct_search_count by provenance, mode, app, type, user, host, _time
+        </query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <search id="captainElectionBaseSearch">
+    <query>
+`dmc_set_index_internal` search_group="$group$" sourcetype=splunkd component=Metrics group=captainstability upgrades_to_captain=1
+| stats count by _time, upgrades_to_captain, host
+        </query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <search id="captainSnapshotSearch">
+    <query>
+      | rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/shcluster/captain/info
+      | dedup peer_scheme_host_port
+      | fields label
+    </query>
+    <finalized>
+      <set token="captain_name">$result.label$</set>
+    </finalized>
+  </search>
+  <search id="membersSnapshotSearch">
+    <query>
+| rest splunk_server=local /services/search/distributed/peers
+| where search_groups="$group$" AND server_roles="search_head"
+| eval label = host
+| join guid type=outer [
+  | rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head /services/shcluster/member/members count=0
+  | dedup label
+  | eval guid = title
+]
+| join label type=outer [
+  | rest splunk_server=$captain_name$ /services/shcluster/captain/members count=0
+  | where splunk_server == label
+  | fields label, last_heartbeat
+  | rename last_heartbeat as last_heartbeat_captain
+]
+| eventstats values(last_heartbeat_captain) as last_heartbeat_captain
+| join label type=outer [
+  | rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head /services/shcluster/captain/info
+  | where splunk_server == label
+  | eval age = now() - elected_captain
+  | eval captain_age = case(age &lt; 60, "&lt; 1m", age &gt;= 60 AND age &lt; 3600, round(age / 60, 0)."m", age &gt;= 3600 AND age &lt; 86400, round(age / 3600, 0)."h", age &gt;= 86400, round(age / 86400, 0)."d")
+  | `dmc_time_format(elected_captain)`
+  | eval role = "Captain (" . captain_age . ")"
+  | fields label captain_age elected_captain role
+]
+| join label type=outer [
+  | rest /services/replication/configuration/health check_share_baseline=1 splunk_server_group="$group$" splunk_server_group=dmc_group_search_head
+  | stats values(server_name) as baselines, count(server_name) as num_baselines by splunk_server, check_share_baseline
+  | eval shared_common_baseline = if(check_share_baseline == "Yes", baselines, "")
+  | eval no_shared_common_baseline = if(check_share_baseline == "No", baselines, "")
+  | eval unable_to_connect = if(check_share_baseline == "Connection error", baselines, "")
+  | eval num_shared_common_baseline = if(check_share_baseline == "Yes", num_baselines, 0)
+  | eval num_no_shared_common_baseline = if(check_share_baseline == "No", num_baselines, 0)
+  | eval num_unable_to_connect = if(check_share_baseline == "Connection error", num_baselines, 0)
+  | stats sum(num_shared_common_baseline) as total_shared_common_baseline, sum(num_no_shared_common_baseline) as total_no_shared_common_baseline, sum(num_unable_to_connect) as total_unable_to_connect, values(shared_common_baseline) as shared_common_baseline, values(no_shared_common_baseline) as no_shared_common_baseline, values(unable_to_connect) as unable_to_connect by splunk_server
+  | eval ratio = total_shared_common_baseline . "/" . (total_shared_common_baseline+total_no_shared_common_baseline+total_unable_to_connect)
+  | rename splunk_server as label
+]
+| join label type=outer [
+  | rest /services/replication/configuration/health unpublished=1 splunk_server_group="$group$" splunk_server_group=dmc_group_search_head
+  | rename "Number of unpublished changes" as unpublished_changes
+  | eval unpublished_changes=if(unpublished_changes=="0 (this instance is the captain)", 0, unpublished_changes)
+  | rename splunk_server as label
+]
+| eval role = if(isnotnull(role), role, "Member")
+| sort role
+    </query>
+  </search>
+  <fieldset submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="group">
+      <label>Search Head Cluster:</label>
+      <showClearButton>false</showClearButton>
+      <populatingSearch fieldForLabel="label" fieldForValue="search_group">| `dmc_get_search_head_cluster_groups`</populatingSearch>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-4h@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>bundle WARN &amp; ERROR</title>
+      <table>
+        <search>
+          <query>index=_internal search_group=$group$ search_group=dmc_group_search_head source=*splunkd.log* component=*distributed* log_level!=INFO | rex "\d{2}\-\d{2}\-\d{4}\s+\d{2}\:\d{2}\:\d{2}\.\d{3}\s+\S+\s+\w+\s+\w+(?&lt;msg&gt;.+)" | stats count by host component log_level msg | sort -count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="wrow">$click.name$</set>
+        </drilldown>
+      </table>
+      <html>
+    <p>Click any row above to see timechart</p>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$wrow$">
+      <title>distributed search warnings and errors</title>
+      <input type="dropdown" token="span" searchWhenChanged="true">
+        <label>span</label>
+        <choice value="minspan=10s">auto</choice>
+        <choice value="span=1m">1m</choice>
+        <choice value="span=5m">5m</choice>
+        <choice value="span=15m">15m</choice>
+        <choice value="span=1h">1h</choice>
+        <default>span=5m</default>
+        <initialValue>span=5m</initialValue>
+        <fieldForLabel>span</fieldForLabel>
+        <fieldForValue>span</fieldForValue>
+      </input>
+      <chart>
+        <search>
+          <query>index=_internal search_group=$group$ search_group=dmc_group_search_head source=*splunkd.log* component=*distributed*  log_level!=INFO  | timechart $span$ count by  host useother=f limit=0</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">447</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="host1">$click.name2$</set>
+        </drilldown>
+      </chart>
+      <html>
+    <p>Click any host to see timechart</p>
+    <a data-unset-token="wrow">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$host1$">
+      <title>distributed search warnings and errors for $host1$</title>
+      <input type="dropdown" token="span" searchWhenChanged="true">
+        <label>span</label>
+        <choice value="minspan=10s">auto</choice>
+        <choice value="span=1m">1m</choice>
+        <choice value="span=5m">5m</choice>
+        <choice value="span=15m">15m</choice>
+        <choice value="span=1h">1h</choice>
+        <default>span=5m</default>
+        <initialValue>span=5m</initialValue>
+        <fieldForLabel>span</fieldForLabel>
+        <fieldForValue>span</fieldForValue>
+      </input>
+      <chart>
+        <search>
+          <query>index=_internal search_group=$group$ search_group=dmc_group_search_head host=$host1$ source=*splunkd.log* component=*distributed*  log_level!=INFO | rex "\d{2}\-\d{2}\-\d{4}\s+\d{2}\:\d{2}\:\d{2}\.\d{3}\s+\S+\s+\w+\s+\w+(?&lt;msg&gt;.+)" | eval host_msg=host.":::".msg | timechart $span$ count by  host_msg useother=f limit=0</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">447</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="host1">$click.value$</set>
+        </drilldown>
+      </chart>
+      <html>
+    <a data-unset-token="host1">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel rejects="$historical$">
+      <title>SHC Member Status</title>
+      <table id="members_table">
+        <title>$totalCountOfMembers$ Members</title>
+        <search base="membersSnapshotSearch">
+          <done>
+            <set token="totalCountOfMembers">$job.resultCount$</set>
+          </done>
+          <error>
+            <set token="totalCountOfMembers">N/A</set>
+          </error>
+          <query>fields label role status 
+
+| rename label as Instance, role as Role, status as Status</query>
+        </search>
+        <!--<option name="refresh.auto.interval">60</option>-->
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.time.visible">0</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <condition field="Instance">
+            <set token="SHCMemberDrilldown">$click.value2$</set>
+          </condition>
+          <condition field="Configuration Baseline Consistency">
+            <set token="SHCMemberBaselineDrilldown">$row.Instance$</set>
+          </condition>
+          <condition field="*"></condition>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Distributed Peer Heartbeat - Peer Count per SH (SH heartbeats peers every 5m)</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group=$group$ search_group=dmc_group_search_head source=*metrics.log* group=search_health_metrics name=distributed_peer_heartbeat | timechart span=5m max(Peer_Count) as peer_count by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">auto</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">zero</option>
+        <option name="charting.chart.showDataLabels">minmax</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Peer count per search head</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/search/distributed/peers
+          | fields splunk_server, peerName
+          | stats list(peerName) as peers dc(peerName) as peerCount by splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>knowledge bundles on SHC captain : $captain_name$</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head  /services/search/distributed/bundle-replication-files | convert ctime(timestamp) as timestamp| eval sizeMB= round(size/1024/1024,2) | table  splunk_server filename location size sizeMB timestamp title| rename splunk_server as "shc_captain" title as "bundle version" | join shc_captain [| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/configs/conf-distsearch | search maxBundleSize=* | table splunk_server maxBundleSize | rename splunk_server as shc_captain maxBundleSize as "maxBundleSize (distsearch.conf)"] | join shc_captain 
+    [| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/shcluster/captain/info 
+    | dedup peer_scheme_host_port 
+    | fields label 
+    | rename label as "shc_captain"]</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>SHC captain ($captain_name$) view of bundle versions on each peer</title>
+      <table>
+        <search>
+          <query>| rest splunk_server=* /services/search/distributed/peers 
+| rex field=bundle_isIndexing "\w\s-\s(?&lt;truefalse&gt;\w+)" 
+| stats values(bundle_versions) as "bundle version" dc(bundle_versions) as "bundle versions on indexer" by splunk_server host status version   guid 
+| rename version as "indexer version" guid as "indexer guid" splunk_server as shc_captain host as indexer 
+| join shc_captain 
+    [| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/shcluster/captain/info 
+    | dedup peer_scheme_host_port 
+    | fields label 
+    | rename label as "shc_captain"]</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>SHC members view of bundle versions on each peer</title>
+      <table>
+        <search>
+          <query>|rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/search/distributed/peers  | rex field=bundle_isIndexing "\w\s-\s(?&lt;truefalse&gt;\w+)" |stats values(bundle_versions) as "bundle versions"  dc(bundle_versions) as "bundle versions on indexer" by  status version splunk_server host guid | rename guid as "indexer guid" splunk_server as search_head host as indexer</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>How much space do my search bundles take up on the indexer?</title>
+      <input type="text" token="bundle_count" searchWhenChanged="true">
+        <label>number of knowledge bundles residing on peer (typically 5-10 per SH/SHC id)</label>
+        <default>10</default>
+        <initialValue>10</initialValue>
+      </input>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/search/distributed/bundle-replication-files  | stats max(size) as max_full_bundle_size by splunk_server | eval bundles_on_peer=$bundle_count$ | eval agg_bundle_size_demand_on_peer=max_full_bundle_size*bundles_on_peer*2 | eval agg_bundle_size_demand_on_peerMB= round(agg_bundle_size_demand_on_peer/1024/1024,2) | table splunk_server max_full_bundle_size bundles_on_peer agg_bundle_size_demand_on_peerMB | rename splunk_server as shc_captain | join shc_captain 
+    [| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/shcluster/captain/info 
+    | dedup peer_scheme_host_port 
+    | fields label 
+    | rename label as "shc_captain"]</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>lookup files which are configured for automatic lookups (don't blacklist these from the knowledge bundle)</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/configs/conf-transforms | search filename=*| table splunk_server eai:acl.app title filename id | rename eai:acl.app as app title as stanza splunk_server as shc_captain | join shc_captain 
+    [| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/shcluster/captain/info 
+    | dedup peer_scheme_host_port 
+    | fields label 
+    | rename label as "shc_captain"]</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>timeout settings - distsearch.conf</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/configs/conf-distsearch | fields *Timeout* splunk_server title id | search title=distributedSearch OR title=replicationSettings | table splunk_server title *Timeout* | rename title as stanza | sort -splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
