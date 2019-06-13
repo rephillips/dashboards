@@ -51,7 +51,7 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
         <option name="count">10</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
-        <option name="rowNumbers">true</option>
+        <option name="rowNumbers">false</option>
         <option name="wrap">true</option>
         <format type="color" field="status">
           <colorPalette type="map">{"skipped":#ffb3b3,"delegated_remote_error":#ffb3b3,"completed":	#ccffcc,"deferred":#ffd966}</colorPalette>
@@ -66,7 +66,7 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
           </option>
         </format>
         <drilldown>
-          <set token="s1">$row.&lt;fieldname&gt;$</set>
+          <set token="s1">$click.value$</set>
         </drilldown>
       </table>
       <html>
@@ -81,7 +81,7 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
         <title>search status timeline</title>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$" $filter$
-(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) | timechart count  by status usenull=f limit=0</query>
+status="$s1$" | timechart count  by status usenull=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -134,19 +134,33 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
   <row>
     <panel>
       <title>2.) Why are searches being skipped or deferred</title>
+      <input type="dropdown" token="reason" searchWhenChanged="true">
+        <label>reason</label>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <fieldForLabel>reason</fieldForLabel>
+        <fieldForValue>reason</fieldForValue>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
+(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) $filter$ | dedup reason | table reason</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
       <table>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
-(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) $filter$ | chart count sparkline(count, 1m) as trend by  reason | sort -count</query>
+(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) $filter$ reason="$reason$" | chart count sparkline(count, 1m) as trend by  reason | sort -count</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
         </search>
         <!-- Set span for each sparkline datapoint to be 1 hour -->
         <!-- Set sparkline options here; make sure that field matches field name of the search results -->
-        <option name="count">3</option>
+        <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
-        <option name="rowNumbers">true</option>
+        <option name="rowNumbers">false</option>
         <option name="wrap">true</option>
         <format field="trend" type="sparkline">
           <option name="type">line</option>
@@ -158,7 +172,7 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
           </option>
         </format>
         <drilldown>
-          <set token="s2">$row.&lt;fieldname&gt;$</set>
+          <set token="s2">$click.value$</set>
         </drilldown>
       </table>
       <html>
@@ -175,7 +189,7 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
       <chart>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$"
-status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error  $filter$ | timechart limit=0 count  by reason usenull=f</query>
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error  $filter$ reason="$s2$" | timechart limit=0 count  by reason usenull=f</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -452,7 +466,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
       <table>
         <title>$s3$</title>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$ savedsearch_name="$s3$"   | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ savedsearch_name="$s3$"  | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed | search status!=success | search status!="delegated_remote" | search status!="delegated_remote_completion"  | stats list(scheduled_time) by  savedsearch_name status | rename list(scheduled_time) as "scheduled time for which search was skipped" | eval scheduler_action = case(status == "skipped", "scheduler will not attempt to re-run these searches for the scheduled_time",status == "delayed", "scheduler will retry to run the search up until the next scheduled_time",status == "deferred", "scheduler will attempt to re-run these searches for their scheduled_time at a future point in time",status == "delegated_remote_error", "scheduler will retry once to delgate, if still fails no further attempt") | table savedsearch_name status scheduler_action "scheduled time for which search was skipped"</query>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$ savedsearch_name="$s3$"   | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ savedsearch_name="$s3$"  | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed | search status!=success | search status!="delegated_remote" | search status!="delegated_remote_completion"  | stats list(scheduled_time) as scheduled_time by  savedsearch_name status  | eval scheduler_action = case(status == "skipped", "scheduler will not attempt to re-run these searches for the scheduled_time",status == "delayed", "scheduler will retry to run the search up until the next scheduled_time",status == "deferred", "scheduler will attempt to re-run these searches for their scheduled_time at a future point in time",status == "delegated_remote_error", "scheduler will retry once to delgate, if still fails no further attempt") | table savedsearch_name status scheduler_action scheduled_time</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -619,10 +633,36 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
   </row>
   <row>
     <panel depends="$s4$">
-      <chart>
-        <title>searches  $s4$ past their scheduled_time</title>
+      <title>Scheduled searches that have been $s4$ for their scheduled time listed below.</title>
+      <table>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$  status=$s4$   | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   $filter$ status=$s4$    | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion  | eval _time=scheduled_time | timechart  count by status limit=0 usenull=f</query>
+          <query>index=_internal search_group=dmc_group_search_head search_group=$group$ source=*scheduler.log*  savedsearch_name=* $filter$   | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group=$group$ source=*scheduler.log*   status=$s4$ savedsearch_name=* $filter$ | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion   | stats list(scheduled_time) by savedsearch_name status | rename list(scheduled_time) as "scheduled time for which search was $s4$"| eval scheduler_action = case(status == "skipped", "scheduler will not attempt to re-run these searches for the scheduled_time",status == "delayed", "scheduler will retry to run the search up until the next scheduled_time",status == "deferred", "scheduler will attempt to re-run these searches for their scheduled_time at a future point in time",status == "delegated_remote_error", "scheduler will retry once to delgate, if still fails no further attempt") | table savedsearch_name status scheduler_action "scheduled time for which search was $s4$" | search status=$s4$</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="s6">$click.value$</set>
+        </drilldown>
+      </table>
+            <html>
+        <a data-unset-token="s4">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s6$">
+      <title>$s6$  was $s4$ for the following scheduled_times</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*  $filter$  status=$s4$   | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log*   $filter$ status=$s4$    | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion |search savedsearch_name="$s6$" | eval _time=scheduled_time | timechart  count by status limit=0 usenull=f</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -661,34 +701,14 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$s4$">
-      <title>Scheduled searches that have been $s4$ for their scheduled time listed below.</title>
-      <table>
-        <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group=$group$ source=*scheduler.log*  savedsearch_name=* $filter$   | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group=$group$ source=*scheduler.log*   status=$s4$ savedsearch_name=* $filter$ | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion   | stats list(scheduled_time) by savedsearch_name status | rename list(scheduled_time) as "scheduled time for which search was $s4$"| eval scheduler_action = case(status == "skipped", "scheduler will not attempt to re-run these searches for the scheduled_time",status == "delayed", "scheduler will retry to run the search up until the next scheduled_time",status == "deferred", "scheduler will attempt to re-run these searches for their scheduled_time at a future point in time",status == "delegated_remote_error", "scheduler will retry once to delgate, if still fails no further attempt") | table savedsearch_name status scheduler_action "scheduled time for which search was $s4$" | search status=$s4$</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="count">1</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">true</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
-      <html>
-    <a data-unset-token="s4">Close this panel</a>
+             <html>
+        <a data-unset-token="s6">Close this panel</a>
   </html>
     </panel>
   </row>
   <row>
     <panel>
+   
       <html>
                  <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
                  <a target="_blank" href="shc_scheduler_analysis_detailed" class="btn btn-primary">continue investigation by looking at SHC status and configurations </a>
