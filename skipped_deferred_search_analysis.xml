@@ -77,8 +77,8 @@ $filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR
   </row>
   <row>
     <panel depends="$s1$">
+      <title>Log events reporting the following status: $s1$</title>
       <chart>
-        <title>search status timeline</title>
         <search>
           <query>`dmc_set_index_internal` source=*scheduler.log  search_group=dmc_group_search_head search_group="$group$" $filter$
 status="$s1$" | timechart count  by status usenull=f limit=0</query>
@@ -652,7 +652,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
           <set token="s6">$click.value$</set>
         </drilldown>
       </table>
-            <html>
+      <html>
         <a data-unset-token="s4">Close this panel</a>
   </html>
     </panel>
@@ -701,14 +701,13 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
-             <html>
+      <html>
         <a data-unset-token="s6">Close this panel</a>
   </html>
     </panel>
   </row>
   <row>
     <panel>
-   
       <html>
                  <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
                  <a target="_blank" href="shc_scheduler_analysis_detailed" class="btn btn-primary">continue investigation by looking at SHC status and configurations </a>
