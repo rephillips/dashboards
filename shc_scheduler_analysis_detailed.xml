@@ -586,7 +586,8 @@ where label == "$SHCMemberDrilldown$"
       <title>scheduled searches running over All Time</title>
       <single>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0   dispatch.earliest_time="" OR dispatch.earliest_time=0  | rename eai:acl.* as *  | table title cron_schedule dispatch.earliest_time dispatch.latest_time app owner  | stats count</query>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0 | search title!="Bucket Copy Trigger"   dispatch.earliest_time="" OR dispatch.earliest_time=0  | rename eai:acl.* as *  | table title cron_schedule dispatch.earliest_time dispatch.latest_time app owner search | search search!=*earliest* | search search=*index*
+  | stats count</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -612,7 +613,7 @@ where label == "$SHCMemberDrilldown$"
       <title>Real Time Searches Running</title>
       <single>
         <search>
-          <query>index=_introspection search_group=dmc_group_search_head search_group=$group$ sourcetype=splunk_resource_usage (component=PerProcess data.search_props.sid::*)  "data.search_props.type"!="ad-hoc"  "data.search_props.mode"=RT* | dedup "data.search_props.label" | table data.search_props.label data.search_props.app data.search_props.mode data.search_props.sid data.elapsed | rename data.search_props.label as "savedsearch name" data.search_props.app as app data.search_props.mode as mode data.search_props.sid as sid data.elapsed as "has been running for (seconds)" | stats count</query>
+          <query>index=_introspection search_group=dmc_group_search_head search_group=$group$ sourcetype=splunk_resource_usage (component=PerProcess data.search_props.sid::*)    "data.search_props.mode"=RT* | dedup "data.search_props.label" | table data.search_props.label data.search_props.app data.search_props.mode data.search_props.sid data.elapsed | rename data.search_props.label as "savedsearch name" data.search_props.app as app data.search_props.mode as mode data.search_props.sid as sid data.elapsed as "has been running for (seconds)" | stats count</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -637,7 +638,7 @@ where label == "$SHCMemberDrilldown$"
   </html>
       <table>
         <search>
-          <query>index=_introspection search_group=dmc_group_search_head search_group=$group$ sourcetype=splunk_resource_usage (component=PerProcess data.search_props.sid::*)    "data.search_props.mode"=RT* | dedup "data.search_props.label" | table data.search_props.label data.search_props.app data.search_props.mode data.search_props.sid data.elapsed | rename data.search_props.label as "savedsearch name" data.search_props.app as app data.search_props.mode as mode data.search_props.sid as sid data.elapsed as "has been running for (seconds)"</query>
+          <query>index=_introspection search_group=dmc_group_search_head search_group=$group$ sourcetype=splunk_resource_usage (component=PerProcess data.search_props.sid::*)    "data.search_props.mode"=RT* | dedup "data.search_props.label" | table data.search_props.label data.search_props.app data.search_props.user data.search_props.type data.search_props.mode data.search_props.sid data.elapsed | rename data.search_props.label as "savedsearch name" data.search_props.app as app data.search_props.user as user data.search_props.type as type data.search_props.mode as mode data.search_props.sid as sid data.elapsed as "has been running for (seconds)"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -728,7 +729,7 @@ where label == "$SHCMemberDrilldown$"
       <table>
         <title>scheduled searches running over All Time</title>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0   dispatch.earliest_time="" OR dispatch.earliest_time=0  | rename eai:acl.* as *  | table title cron_schedule dispatch.earliest_time dispatch.latest_time app owner</query>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0   | search title!="Bucket Copy Trigger" dispatch.earliest_time="" OR dispatch.earliest_time=0  | rename eai:acl.* as *  | table title cron_schedule dispatch.earliest_time dispatch.latest_time app owner search | search search!=*earliest* | search search=*index*</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -1162,6 +1163,28 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>time spent in shcluster/member/delegatejob endpoint of shc members</title>
+      <table>
+        <title>spent &gt; 1000 ms</title>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*splunkd_access.log* /shcluster/member/delegatejob/ spent&gt;1000  | stats values(spent) as spent_ms by host uri_path</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">3</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
   <row>
