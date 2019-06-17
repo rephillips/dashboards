@@ -1333,7 +1333,7 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
     <panel>
       <html>
                  <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
-                 <a target="_blank" href="Indexing_Performance" class="btn btn-primary">continue investigation by looking at Indexer Performance </a>
+                 <a target="_blank" href="indexing_performance" class="btn btn-primary">continue investigation by looking at Indexer Performance </a>
              </html>
     </panel>
   </row>
