@@ -1,5 +1,5 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
-  <label>SHC: Search Knowledge Bundle</label>
+  <label>SHC_Search_Knowledge_Bundle</label>
   <search id="members_heartbeat_timeout_base" base="membersSnapshotSearch">
     <query>
           fields label, status, last_heartbeat, last_heartbeat_captain
