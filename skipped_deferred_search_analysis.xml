@@ -36,7 +36,7 @@
       </default>
     </input>
   </fieldset>
-  <row>
+  <!--row>
     <panel>
       <html>
   <h3>Search status definition</h3>
@@ -48,7 +48,7 @@
   
 </html>
     </panel>
-  </row>
+  </row-->
   <row>
     <panel>
       <title>1.) Are searches being skipped or deferred</title>
@@ -614,7 +614,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
   </html>
     </panel>
   </row>
-  <row>
+  <!--row>
     <panel>
       <html>
   <h3>Overall skipped and deferred search impact</h3>
@@ -624,7 +624,7 @@ status=skipped OR status=continued OR status=deferred OR status=delegated_remote
   
 </html>
     </panel>
-  </row>
+  </row-->
   <row>
     <panel>
       <title>4.) Overall Impact of unique searches in the last $time.earliest$</title>
