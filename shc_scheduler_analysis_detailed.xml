@@ -708,7 +708,7 @@ where label == "$SHCMemberDrilldown$"
   </html>
       <table>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$  | search  disabled=0 is_scheduled=1| table title  cron_schedule dispatch.earliest_time dispatch.latest_time auto_summarize  action.email realtime_schedule eai:acl.app eai:acl.owner schedule_priority auto_summarize.dispatch.earliest_time auto_summarize.dispatch.latest_time allow_skew  action.summary_index | append [ | rest /servicesNS/-/-/data/models splunk_server=$captain_name$ | search acceleration=1 | table title acceleration.cron_schedule acceleration.earliest_time acceleration.max_time dataset.type eai:acl.app eai:acl.owner  | rename acceleration.cron_schedule as acceleration_cron_schedule acceleration.earliest_time as acceleration_et acceleration.max_time as acceleration_max_time dataset.type as dataset_type eai:acl.app as app eai:acl.owner as owner]</query>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$  | search  disabled=0 is_scheduled=1| table title  cron_schedule dispatch.earliest_time dispatch.latest_time auto_summarize  action.email realtime_schedule eai:acl.app eai:acl.owner schedule_priority auto_summarize.dispatch.earliest_time auto_summarize.dispatch.latest_time allow_skew  action.summary_index search  | append [ | rest /servicesNS/-/-/data/models splunk_server=$captain_name$ | search acceleration=1 | table title acceleration.cron_schedule acceleration.earliest_time acceleration.max_time dataset.type eai:acl.app eai:acl.owner  | rename acceleration.cron_schedule as acceleration_cron_schedule acceleration.earliest_time as acceleration_et acceleration.max_time as acceleration_max_time dataset.type as dataset_type eai:acl.app as app eai:acl.owner as owner ]</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -982,25 +982,11 @@ where label == "$SHCMemberDrilldown$"
       <chart>
         <search>
           <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$
-| regex cron_schedule="\*\s\*\s\*\s\*$$"
-| search is_scheduled=1 disabled=0
-| eval cron_schedule=if(title="test1 Clone","1,12,24,36,48 * * * *",cron_schedule)
-| fields title cron_schedule
-| rex field=cron_schedule "^(?&lt;minute_position&gt;(?&lt;first_minute&gt;[^-\/\s,]+)(?:[^\/]*\/(?&lt;divisor&gt;\S+))?\S*)"
-| eval first_minute=case(match(minute_position,"^\*"),"0",match(cron_schedule,","),split(minute_position,","),1=1,first_minute)
-| mvexpand first_minute
-| eval divisor=if(match(minute_position,"\*$$"),"1",divisor)
-| eval multiplier=round(60/divisor,2)
-| eval trimmer=floor(60-multiplier)
-| eval rex="^.{".trimmer."}(.*)"
-| eval job_run_count=split(replace("||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||",rex,"\1"),"")
-| fillnull value=" | " job_run_count
-| eval count=1
-| mvexpand job_run_count
-| streamstats sum(count) AS count by title
-| eval scheduled_min=if(isnull(multiplier),first_minute,floor((60/multiplier)*(count-1)+first_minute)),scheduled_min=if(len(scheduled_min)=1,"0".scheduled_min,scheduled_min)
-| where scheduled_min &lt; 360
-| stats count(cron_schedule) by scheduled_min | join splunk_server [| rest splunk_server=$captain_name$ "/services/server/status/limits/search-concurrency?cluster_wide_quota=1"
+search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now 
+          | table title cron_schedule scheduled_times 
+          | mvexpand scheduled_times 
+          | rename scheduled_times as _time 
+          | timechart span=1m count as "Searches Scheduled" | join splunk_server [| rest splunk_server=$captain_name$ "/services/server/status/limits/search-concurrency?cluster_wide_quota=1"
               | stats max(max_hist_scheduled_searches) as max_clusterwide_scheduler_concurrency ]</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
@@ -1044,6 +1030,35 @@ where label == "$SHCMemberDrilldown$"
           <set token="c1">$click.value$</set>
         </drilldown>
       </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$c1$">
+      <title>number of searches scheduled at $c1$</title>
+      <table>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$
+    search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now 
+| mvexpand scheduled_times 
+
+| search scheduled_times=$c1$
+| table title scheduled_times eai:acl.app eai:acl.owner | rename title as savedsearch_name eai:acl.app as app eai:acl.owner as owner | convert ctime(scheduled_times) as scheduled_times | stats values(savedsearch_name) as savedsearch_name by scheduled_times app owner</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+      <html>
+    <a data-unset-token="c1">Close this panel</a>
+  </html>
     </panel>
   </row>
   <row>
