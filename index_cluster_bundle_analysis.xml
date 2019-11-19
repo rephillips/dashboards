@@ -1,5 +1,6 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
   <label>index cluster bundle analysis</label>
+  <description>This view is intended to be loaded on the Monitoring Console inside the splunk_monitoring_console app</description>
   <fieldset autoRun="true" submitButton="false">
     <input type="dropdown" searchWhenChanged="true" token="group">
       <label>Index Cluster</label>
@@ -199,7 +200,7 @@
       <title>"bundle validation in progress"</title>
       <chart>
         <search>
-          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" "Bundle validation is in progress" | timechart  span=1m count as "bundle validation in progress"</query>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" NOT DispatchManager "Bundle validation is in progress" | timechart  span=1m count as "bundle validation in progress"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -244,7 +245,7 @@
       <chart>
         <title>count of peers that downloaded bundle from CM</title>
         <search>
-          <query>index=_internal  search_group="$group$" source=*splunkd_access.log* "GET /services/streams/clusterbundles?latest_bundle" OR "POST /services/cluster/master/control/control/apply" NOT 127.0.0.1 | timechart $span$ dc(clientip) as "count of peers that downloaded bundle from CM"</query>
+          <query>index=_internal  search_group="$group$" NOT DispatchManager source=*splunkd_access.log* "GET /services/streams/clusterbundles?latest_bundle" OR "POST /services/cluster/master/control/control/apply" NOT 127.0.0.1 | timechart $span$ dc(clientip) as "count of peers that downloaded bundle from CM"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -368,7 +369,7 @@
         <option name="charting.chart.nullValueMode">gaps</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.stackMode">stacked</option>
         <option name="charting.chart.style">shiny</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
@@ -458,7 +459,7 @@
         <option name="charting.chart.nullValueMode">gaps</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.stackMode">stacked</option>
         <option name="charting.chart.style">shiny</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
@@ -546,7 +547,7 @@
         <option name="charting.chart.nullValueMode">gaps</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.stackMode">stacked</option>
         <option name="charting.chart.style">shiny</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
@@ -610,7 +611,7 @@
       <title>Splunk Restart timeline (distinct count of peers+CM)</title>
       <chart>
         <search>
-          <query>index=_internal   search_group="dmc_indexerclustergroup_lab-cluster01" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart $span$ dc(host) limit=0</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart $span$ dc(host) limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -634,7 +635,7 @@
         <option name="charting.chart.nullValueMode">gaps</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.stackMode">stacked</option>
         <option name="charting.chart.style">shiny</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
@@ -655,7 +656,7 @@
       <title>restart duration by host</title>
       <chart>
         <search>
-          <query>index=_internal   search_group="$group$" source=*splunkd.log*   "Shutting down splunkd" OR "Splunkd starting" | transaction startswith="Shutting down splunkd" endswith="Splunkd starting" | timechart $span$ max(duration) by host limit=0</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager  "Shutting down splunkd" OR "Splunkd starting" | transaction startswith="Shutting down splunkd" endswith="Splunkd starting" | timechart $span$ max(duration) by host limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -700,12 +701,96 @@
       <title>duration of shutdown-restart of splunk</title>
       <table>
         <search>
-          <query>index=_internal   search_group="$group$" source=*splunkd.log*   "Shutting down splunkd" OR "Splunkd starting" | transaction startswith="Shutting down splunkd" endswith="Splunkd starting" | table host duration closed_txn</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager   "Shutting down splunkd" OR "Splunkd starting" | transaction startswith="Shutting down splunkd" endswith="Splunkd starting" | table host duration closed_txn</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>duration of idx cluster rolling restart</title>
+      <table>
+        <search>
+          <query>index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager rolling restart CMMaster "Starting a rolling restart of the peers" OR "rolling restart finished" | transaction startswith="Starting a rolling restart of the peers" endswith="rolling restart finished" | table host duration | rename duration as "duration of idx cluster rolling restart (sec)" host as "cluster master"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>index cluster rolling restart timeline</title>
+      <chart>
+        <search>
+          <query>index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager rolling restart CMMaster "Starting a rolling restart of the peers" | timechart bins=200 span=1m count as "Starting a rolling restart of the peers" | join _time [search index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager rolling restart CMMaster "rolling restart finished" | timechart bins=200 span=1m count as "rolling restart finished"]</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>conf files that triggered restart of splunk</title>
+      <table>
+        <search>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log*  NOT DispatchManager  component=ClusterSlaveConfigReloader "cannot be loaded without a restart" | table host confs _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
