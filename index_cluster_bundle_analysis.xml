@@ -14,9 +14,20 @@
     <input type="time" token="time" searchWhenChanged="true">
       <label></label>
       <default>
-        <earliest>-24h@h</earliest>
+        <earliest>-60m@m</earliest>
         <latest>now</latest>
       </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="minspan=10s">auto</choice>
+      <choice value="span=1m">1m</choice>
+      <choice value="span=5m">5m</choice>
+      <choice value="span=15m">15m</choice>
+      <choice value="span=1h">1h</choice>
+      <choice value="span=4h">4h</choice>
+      <default>minspan=10s</default>
+      <initialValue>minspan=10s</initialValue>
     </input>
   </fieldset>
   <row>
@@ -44,6 +55,27 @@
       <html>
         <p>Click on instance name above to see more detail.</p>
       </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>peer count by latest/active bundle id</title>
+      <table>
+        <title>In a normal scenario after a bundle push from the CM , all peers should have the same latest &amp; active bundle id</title>
+        <search>
+          <query>| rest /services/cluster/master/peers splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$" | stats dc(label) as "peer count" by latest_bundle_id active_bundle_id</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
   <row>
@@ -167,7 +199,7 @@
       <title>"bundle validation in progress"</title>
       <chart>
         <search>
-          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" NOT DispatchManager "Bundle validation is in progress " | timechart  span=1m count as "bundle validation in progress"</query>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" "Bundle validation is in progress" | timechart  span=1m count as "bundle validation in progress"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -212,7 +244,7 @@
       <chart>
         <title>count of peers that downloaded bundle from CM</title>
         <search>
-          <query>index=_internal  search_group="$group$" source=*splunkd_access.log* "GET /services/streams/clusterbundles?latest_bundle" OR "POST /services/cluster/master/control/control/apply" NOT 127.0.0.1 | timechart span=5m dc(clientip) as "count of peers that downloaded bundle from CM"</query>
+          <query>index=_internal  search_group="$group$" source=*splunkd_access.log* "GET /services/streams/clusterbundles?latest_bundle" OR "POST /services/cluster/master/control/control/apply" NOT 127.0.0.1 | timechart $span$ dc(clientip) as "count of peers that downloaded bundle from CM"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -268,7 +300,7 @@
       <chart>
         <title>$bundle$</title>
         <search>
-          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager "Informed bundle success status to the master for bundle" $bundle$  | eval host_bundle=host."::".id | timechart span=5m count by host_bundle</query>
+          <query>index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager Informed bundle success status Bundle validation successful $bundle$  | eval host_bundle=host."::".id | timechart $span$ count by host_bundle</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -308,11 +340,57 @@
       </chart>
     </panel>
     <panel>
+      <title>peer informed bundle validation success status to the master (distinct count of peers)</title>
+      <chart>
+        <title>$bundle$</title>
+        <search>
+          <query>index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager Informed bundle success status Bundle validation successful $bundle$  | eval host_bundle=host."::".id | timechart $span$ dc(host) by id</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>cluster master receipt of "bundle validation success" msg from peers</title>
       <chart>
         <title>$bundle$</title>
         <search>
-          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" NOT DispatchManager  "Bundle validation success reported by" | rename bundleid as id| search $bundle$  |timechart span=1m count as "bundle validation success msg" by peer_name</query>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$"  NOT DispatchManager  Bundle validation success reported by successful for | rename bundleid as id| search $bundle$  |timechart $span$ count as "bundle validation success msg" by peer_name</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -337,6 +415,50 @@
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
         <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>cluster master receipt of "bundle validation success" msg from peers (distinct count of peers)</title>
+      <chart>
+        <title>$bundle$</title>
+        <search>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$"  NOT DispatchManager  Bundle validation success reported by successful for | rename bundleid as id| search $bundle$   |timechart $span$ dc(peer_name)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
         <option name="charting.chart.style">shiny</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
@@ -357,7 +479,7 @@
       <title>Peer applies bundle</title>
       <chart>
         <search>
-          <query>index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager  CMSlave "Moving the downloaded bundle" "to slave-apps" | timechart span=5m count by host</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager  CMSlave "Moving the downloaded bundle" "to slave-apps" | timechart $span$ count by host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -396,10 +518,53 @@
         <option name="trellis.size">medium</option>
       </chart>
     </panel>
+    <panel>
+      <title>Peer applies bundle (distinct count of peers)</title>
+      <chart>
+        <search>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager  CMSlave "Moving the downloaded bundle" "to slave-apps" | timechart minspan=10s dc(host)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
   </row>
   <row>
     <panel>
-      <title>Splunk Restart timeline for $group$</title>
+      <title>Splunk Restart timeline</title>
       <chart>
         <search>
           <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart span=5m count by host</query>
