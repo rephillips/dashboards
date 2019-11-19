@@ -59,27 +59,6 @@
     </panel>
   </row>
   <row>
-    <panel>
-      <title>peer count by latest/active bundle id</title>
-      <table>
-        <title>In a normal scenario after a bundle push from the CM , all peers should have the same latest &amp; active bundle id</title>
-        <search>
-          <query>| rest /services/cluster/master/peers splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$" | stats dc(label) as "peer count" by latest_bundle_id active_bundle_id</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="count">50</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
-        <option name="rowNumbers">true</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
-    </panel>
-  </row>
-  <row>
     <panel depends="$cmaster$">
       <title>cluster master status</title>
       <html>
@@ -119,6 +98,27 @@
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
         <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>peer count by latest/active bundle id</title>
+      <table>
+        <title>In a normal scenario after a bundle push from the CM , all peers should have the same latest &amp; active bundle id</title>
+        <search>
+          <query>| rest /services/cluster/master/peers splunk_server_group=dmc_group_cluster_master splunk_server_group="$group$" | stats dc(label) as "peer count" by latest_bundle_id active_bundle_id</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
@@ -706,11 +706,10 @@
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">50</option>
+        <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
