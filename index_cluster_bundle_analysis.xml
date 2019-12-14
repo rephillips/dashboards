@@ -1,6 +1,6 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
   <label>index cluster bundle analysis</label>
-  <description>This view is intended to be loaded on the Monitoring Console inside the splunk_monitoring_console app</description>
+  <description>This view is intended to be loaded on the Monitoring Console inside the splunk_monitoring_console app. Choose a time period when an index cluster bundle was pushed to populate data in dashboard.</description>
   <fieldset autoRun="true" submitButton="false">
     <input type="dropdown" searchWhenChanged="true" token="group">
       <label>Index Cluster</label>
@@ -197,6 +197,52 @@
   </row>
   <row>
     <panel>
+      <title>CM receipt of heartbeat from distinct count of peers</title>
+      <chart>
+        <title>heartbeat configured in: CM server.conf [clustering] "heartbeat_period"</title>
+        <search>
+          <query>index=_internal source=*splunkd_access.log* search_group=dmc_group_cluster_master search_group="$group$" "/services/cluster/master/peers/" | rex "services\/cluster\/master\/peers\/(?&lt;guid&gt;\w+\-\w+\-\w+\-\w+\-\w+)\/" | timechart span=10s dc(guid) by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>"bundle validation in progress"</title>
       <chart>
         <search>
@@ -222,6 +268,49 @@
         <option name="charting.chart.bubbleMinimumSize">10</option>
         <option name="charting.chart.bubbleSizeBy">area</option>
         <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>"bundle reload in progress"</title>
+      <chart>
+        <search>
+          <query>index=_internal source=*splunkd.log* search_group=dmc_group_cluster_master search_group="$group$" NOT DispatchManager "Bundle reload is in progress" | timechart  span=1m count as "Bundle reload is in progress"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
         <option name="charting.chart.stackMode">default</option>
@@ -288,7 +377,7 @@
   <row>
     <panel>
       <input type="text" token="bundle" searchWhenChanged="true">
-        <label>bundle filter</label>
+        <label>bundle id filter</label>
         <default>*</default>
         <prefix>id=</prefix>
         <initialValue>*</initialValue>
@@ -565,10 +654,218 @@
   </row>
   <row>
     <panel>
+      <title>Peer informed CM of bundle reload</title>
+      <chart>
+        <search>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "Informed bundle reload status" "to the master for bundle"| timechart $span$ count by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Peer informed master of bundle reload (distinct count of peers)</title>
+      <chart>
+        <search>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "Informed bundle reload status" "to the master for bundle"| timechart $span$ dc(host)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>CM receipt of restart_required message from peers by peer_name</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager CMPeer - Bundle reload status peer | timechart dc(restart_required) by peer_name</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>CM receipt of restart_required message from peers</title>
+      <chart>
+        <title>1 = restart required , 0 = restart not required</title>
+        <search>
+          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager CMPeer - Bundle reload status peer | timechart dc(peer) by restart_required</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>CM issues a restart of peer (distinct count of peer guid)</title>
+      <input type="dropdown" token="span1" searchWhenChanged="true">
+        <label>span</label>
+        <choice value="minspan=10s">auto</choice>
+        <choice value="span=1m">1m</choice>
+        <choice value="">5m</choice>
+        <choice value="span=15m">15m</choice>
+        <choice value="span=1h">1h</choice>
+        <choice value="span=2h">2h</choice>
+        <choice value="span=3h">3h</choice>
+        <choice value="span=4h">4h</choice>
+        <choice value="span=12h">12h</choice>
+        <default>minspan=10s</default>
+        <initialValue>minspan=10s</initialValue>
+      </input>
+      <chart>
+        <search>
+          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager restart host="rplinux-CM_DMC" Restart peer with guid | timechart $span1$ dc(guid)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">"peers successfully responded to restart request"</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>Splunk Restart timeline by host</title>
       <chart>
         <search>
-          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart $span$ count by host limit=0</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart $span1$ count by host limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -611,7 +908,7 @@
       <title>Splunk Restart timeline (distinct count of peers+CM)</title>
       <chart>
         <search>
-          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart $span$ dc(host) limit=0</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager "My GUID" | timechart $span1$ dc(host) limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -718,7 +1015,7 @@
   </row>
   <row>
     <panel>
-      <title>duration of idx cluster rolling restart</title>
+      <title>duration of index cluster rolling restart</title>
       <table>
         <search>
           <query>index=_internal  search_group="$group$" source=*splunkd.log* NOT DispatchManager rolling restart CMMaster "Starting a rolling restart of the peers" OR "rolling restart finished" | transaction startswith="Starting a rolling restart of the peers" endswith="rolling restart finished" | table host duration | rename duration as "duration of idx cluster rolling restart (sec)" host as "cluster master"</query>
