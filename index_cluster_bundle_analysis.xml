@@ -540,7 +540,7 @@
       </chart>
     </panel>
     <panel>
-      <title>peer informed bundle validation success status to the master (distinct count of peers)</title>
+      <title>peer informed bundle validation success status to the master (distinct count of peers) by bundle id</title>
       <chart>
         <title>$bundle$</title>
         <search>
@@ -552,7 +552,7 @@
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
         <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
         <option name="charting.axisTitleY2.visibility">visible</option>
         <option name="charting.axisX.abbreviation">none</option>
         <option name="charting.axisX.scale">linear</option>
@@ -917,7 +917,7 @@
         <label>span</label>
         <choice value="minspan=10s">auto</choice>
         <choice value="span=1m">1m</choice>
-        <choice value="">5m</choice>
+        <choice value="span=5m">5m</choice>
         <choice value="span=15m">15m</choice>
         <choice value="span=1h">1h</choice>
         <choice value="span=2h">2h</choice>
@@ -929,7 +929,7 @@
       </input>
       <chart>
         <search>
-          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager  Restart peer with guid | timechart $span1$ dc(guid)</query>
+          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager  Restart peer with guid |dedup guid| timechart $span1$ dc(guid)</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -1108,7 +1108,7 @@
       <title>duration of shutdown-restart of splunk</title>
       <table>
         <search>
-          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager   "Shutting down splunkd" OR "Splunkd starting" | transaction startswith="Shutting down splunkd" endswith="Splunkd starting" | table host duration closed_txn</query>
+          <query>index=_internal   search_group="$group$" source=*splunkd.log* NOT DispatchManager   "Shutting down splunkd" OR "Splunkd starting" | transaction host startswith="Shutting down splunkd" endswith="Splunkd starting" maxspan=600s | table host duration closed_txn</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -1117,6 +1117,7 @@
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -1137,6 +1138,7 @@
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -1263,10 +1265,21 @@
         
         <br/>
          <p>
-          <a href="https://docs.splunk.com/Documentation/Splunk/7.2.6/Indexer/Configurationbundleissues" target="_blank" class="external">Learn More</a>
+          <a href="https://docs.splunk.com/Documentation/Splunk/7.2.6/Indexer/Configurationbundleissues" target="_blank" class="external">Configuration bundle issues</a>
+        </p>
+         <p>
+          <a href="https://docs.splunk.com/Documentation/Splunk/8.0.0/Indexer/Updatepeerconfigurations#Restart_or_reload_after_configuration_bundle_changes.3F" target="_blank" class="external">Changes that require a restart of peers</a>
         </p>
         
       </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+                 <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
+                 <a target="_blank" href="index_cluster_bundle_push_operation" class="btn btn-primary">Review logs for idxc bundle push </a>
+             </html>
     </panel>
   </row>
 </form>
