@@ -1,0 +1,387 @@
+<form theme="light">hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light"&gt;
+<label>index_cluster_bundle_push_operation</label>
+  <description>This view is intended to be loaded on the Monitoring Console inside the splunk_monitoring_console app. Choose a time period when an index cluster bundle was pushed to populate data in dashboard.</description>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="group">
+      <label>Index Cluster</label>
+      <showClearButton>false</showClearButton>
+      <search>
+        <query>| `dmc_get_indexer_cluster_groups`</query>
+      </search>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="minspan=10s">auto</choice>
+      <choice value="span=1m">1m</choice>
+      <choice value="span=5m">5m</choice>
+      <choice value="span=15m">15m</choice>
+      <choice value="span=1h">1h</choice>
+      <choice value="span=4h">4h</choice>
+      <default>minspan=10s</default>
+      <initialValue>minspan=10s</initialValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>1.) Initially the bundle status is "None".</title>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>2.) When we run the command "splunk apply cluster-bundle" on CM, it calls the rest endpoint "/services/cluster/master/control/control/apply" which would trigger the rest handler for applying bundle on cluster master.</title>
+      <table>
+        <search>
+          <query>index=_internal search_group=$group$  source=*splunkd_access.log* NOT DispatchManager "POST /services/cluster/master/control/control/apply HTTP/1.1" 200 | table host _time _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>3.)  Bundle state transitions from "None" to "Bundle Creation is in progress" as it creates new bundle on CM.</title>
+      <table>
+        <search>
+          <query>index=_internal search_group=$group$  source=*splunkd.log* NOT DispatchManager CMBundleMgr to=*  from=* transitioning| table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>4.) Bundle state transitions from "Bundle Creation is in progress" to "None" and we update the latest bundle on CM with new bundle.</title>
+      <table>
+        <search>
+          <query>index=_internal search_group=$group$  source=*splunkd.log* NOT DispatchManager (CMBundleMgr - apply bundle status transitioning from Bundle Creation is in progress to\='None') OR (CMMaster - Changing the latest bundle on the master) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>5.) Bundle state changes from "None" to "Bundle validation is in progress". At every service interval, CM checks if bundle validation by peers has succeeded or not.</title>
+      <table>
+        <search>
+          <query>index=_internal search_group=$group$  source=*splunkd.log* NOT DispatchManager (Tracking bundle validation status for peers) OR (CMBundleMgr - apply bundle status transitioning from\='None', to\='Bundle validation is in progress.') OR (CMMaster - Bundle validation is in progress for peers) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>6.) when the peer next heartbeats to CM, from the heartbeat response it sees that the latest bundle on CM has changed and hence it needs to download, validate and apply the bundle. This is done by running a BundleValidate job on peer.</title>
+      <input type="multiselect" token="host" searchWhenChanged="true">
+        <label></label>
+        <choice value="*">all</choice>
+        <valuePrefix>host=</valuePrefix>
+        <delimiter> OR </delimiter>
+        <fieldForLabel>host</fieldForLabel>
+        <fieldForValue>host</fieldForValue>
+        <search>
+          <query>index=_internal  search_group=$group$ search_group="dmc_group_indexer" OR search_group="dmc_group_cluster_master" | dedup host |table host</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
+        </search>
+        <default>*</default>
+        <initialValue>*</initialValue>
+      </input>
+      <table>
+        <title>select the CM and a Peer to examine in this step</title>
+        <search>
+          <query>index=_internal  search_group=$group$ $host$ source=*splunkd.log* NOT DispatchManager (CMBundleMgr - Downloaded bundle path) OR (CMBundleMgr - untarring bundle) OR (ClusterBundleValidator - Validating bundle path) OR (CMSlave - Validation successfull for bundle) OR (BundleJob - Informed bundle success status to the master for bundle) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>7.) After downloading and validating bundle successfully, peers reports back to CM about successful bundle validation.</title>
+      <table>
+        <search>
+          <query>index=_internal  search_group=$group$ source=*splunkd.log* NOT DispatchManager (CMPeer - Bundle validation success reported by) OR (CMMaster - Bundle validation is in progress for peers) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>8.) CM then changes the active bundle on its end to latest bundle(i.e. now active_bundle=latest_bundle) , bundle state changes from "Bundle validation is in progress." to "Bundle reload is in progress. Waiting for all peers to return the status." and issues a bundle reload to peers, if they are reload capable.</title>
+      <input type="multiselect" token="host1" searchWhenChanged="true">
+        <label></label>
+        <choice value="*">all</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <valuePrefix>host=</valuePrefix>
+        <delimiter> OR </delimiter>
+        <fieldForLabel>host</fieldForLabel>
+        <fieldForValue>host</fieldForValue>
+        <search>
+          <query>index=_internal  search_group=$group$ search_group="dmc_group_indexer" OR search_group="dmc_group_cluster_master" | dedup host |table host</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
+      <table>
+        <title>select the CM and a Peer to examine in this step</title>
+        <search>
+          <query>index=_internal  search_group=$group$ $host1$ source=*splunkd.log* NOT DispatchManager (Removing previousActive bundle) OR (setting previousActive bundle) OR (Start scan to find the _previousActive file on the master) OR (CMRepJob - running job=CMBundleRemoveJob bundle) OR (CMBundleMgr - setting active bundle) OR (CMBundleMgr - Found the '_active' file) OR (CMMaster - Peers have indicated they are reload capable, issuing bundle reload.) OR (CMBundleMgr - apply bundle status transitioning from\='Bundle validation is in progress.', to\='Bundle reload is in progress. Waiting for all peers to return the status.') OR (CMMaster - The configuration changes will be applied once all peers have reported restart status for bundle reload.) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>9.) Peer then tries to reload the bundle and moves the downloaded bundle to etc/slave-apps. It then checks which configurations/apps are changed and based on the policy it determines if it requires restart to reload the bundle.</title>
+      <input type="multiselect" token="host2" searchWhenChanged="true">
+        <label></label>
+        <choice value="*">all</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <delimiter> OR </delimiter>
+        <fieldForLabel>host</fieldForLabel>
+        <fieldForValue>host</fieldForValue>
+        <search>
+          <query>index=_internal  search_group=$group$ search_group="dmc_group_indexer" OR search_group="dmc_group_cluster_master" | dedup host |table host</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
+        </search>
+        <valuePrefix>host=</valuePrefix>
+      </input>
+      <table>
+        <title>select the CM and a Peer to examine in this step</title>
+        <search>
+          <query>index=_internal  search_group=$group$ $host2$ source=*splunkd.log* NOT DispatchManager (CMSlave - Reloading - Moving the downloaded bundle to slave-apps) OR 
+(CMSlave - Just queued the reload job for bundleid) OR
+(BundleJob - Reloading - Moving the downloaded bundle) OR 
+(CMBundleMgr - successfully moved bundle from) OR
+(ClusterSlaveConfigReloader - The following confs were downloaded) OR 
+(ClusterSlaveConfigReloader - Some properties in the downloaded conf were changed) OR 
+(ClusterSlaveConfigReloader - The following confs cannot be loaded without a restart) OR
+(ClusterSlaveConfigReloader - Currently loaded indexes are) OR 
+(BundleJob - Restart required to reload bundle id) OR
+(BundleJob - Informed bundle reload status to the master for bundle id) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>10.) CM then waits for response from all peers about restart status for bundle reload.</title>
+      <table>
+        <search>
+          <query>index=_internal  search_group=$group$ source=*splunkd.log* NOT DispatchManager (CMPeer - Bundle reload status peer restart_required) OR
+(CMMaster - The configuration changes will be applied once all peers have reported restart status for bundle reload) OR
+(CMMaster - Restart required to apply the bundle) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>11.) CM then initiates a Rolling restart of the peers (if peers report that restart is required to apply the bundle). Bundle status changes from "Bundle reload is in progress. Waiting for all peers to return the status." to "Rolling restart of the peers is in progress."</title>
+      <table>
+        <search>
+          <query>index=_internal  search_group=$group$  source=*splunkd.log* NOT DispatchManager (CMMaster - Starting a rolling restart of the peers) OR
+(CMMaster - Rolling restart with pre-flight health check results) OR
+(CMRollingManager - This rolling restart initialization has dryRun) OR
+(CMRollingManager - Cleared rolling restart state) OR
+(CMRollingManager restarting) OR
+(CMRollingManager Transitioning progress group for) OR
+(CMBundleMgr - apply bundle status transitioning from\='Bundle reload is in progress. Waiting for all peers to return the status.', to\='Rolling restart of the peers is in progress.') OR
+(CMPeer - peer transitioning from\=Up to\=Restarting reason\="restart peer") OR
+(CMMaster - Restart peer with guid) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>12.) Peers restart to reload the bundle.</title>
+      <input type="multiselect" token="host5" searchWhenChanged="true">
+        <label></label>
+        <choice value="*">all</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <valuePrefix>host=</valuePrefix>
+        <delimiter> OR </delimiter>
+        <fieldForLabel>host</fieldForLabel>
+        <fieldForValue>host</fieldForValue>
+        <search>
+          <query>index=_internal  search_group=$group$ search_group="dmc_group_indexer" OR search_group="dmc_group_cluster_master" | dedup host |table host</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
+      <table>
+        <search>
+          <query>index=_internal  search_group=$group$ $host5$ source=*splunkd.log* NOT DispatchManager (CMSlave - master has instructed peer to restart) OR
+(CMSlave - Transitioning from\=Up to\=Restarting) OR
+(CMSlave - master sends new restart timeout) OR
+(CMSlave - detected restart is required, will restart node) OR
+(ShutdownHandler - kicking state machine due to partial shutdown request) OR
+(ShutdownHandler - Shutting down splunkd) OR
+(ClusteringMgr - Initializing node as slave) OR
+(BucketReplicator - Initializing BucketReplicatorMgr) OR
+(CMServiceThread - CMHealthManager starting eloop) OR
+(CMBundleMgr - bundle found on the slave) OR
+(CMBundleMgr - setting active bundle to latest bundle) OR
+(CMSlave - event\=getActiveBundle status\=success) OR
+(CMBundleMgr - Remove old bundles) OR
+(CMSlave - Slave will continue startup bundle has been moved to slave-apps) OR
+(loader - Bundle is already available in the slave-apps. Continuing with startup.) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>13.) CM finished the rolling restart as bundle has been pushed successfully and bundle state finally transitions from "Rolling restart of the peers is in progress." to "None".</title>
+      <table>
+        <search>
+          <query>index=_internal  search_group=$group$  source=*splunkd.log* NOT DispatchManager (CMRollingManager - Cleared rolling restart state) OR
+(CMRollingManager - Finished rolling restart) OR
+(CMMaster - Triggered fetching of remote storage indexes info as part of event\="bundle has been pushed successfully to slaves") OR
+(CMBundleMgr - apply bundle status transitioning from\='Rolling restart of the peers is in progress.', to\='None') OR
+(CMMaster - Scheduling rebalancing primaries at the end of rolling restart.) OR
+(CMMaster - scheduled rebalance primaries) OR
+(CMMaster - rolling restart finished) | table host _time component _raw | sort +_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
