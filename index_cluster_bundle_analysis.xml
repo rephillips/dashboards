@@ -156,7 +156,7 @@
   </row>
   <row>
     <panel>
-      <title>"splunk apply cluster-bundle" command issued</title>
+      <title>"splunk apply cluster-bundle" command issued on the cluster master</title>
       <chart>
         <search>
           <query>index=_internal search_group=dmc_group_cluster_master search_group="$group$"  source=*splunkd_access.log* NOT DispatchManager "POST /services/cluster/master/control/control/apply HTTP/1.1" 200
@@ -168,7 +168,7 @@
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
         <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
         <option name="charting.axisTitleY2.visibility">visible</option>
         <option name="charting.axisX.abbreviation">none</option>
         <option name="charting.axisX.scale">linear</option>
@@ -929,7 +929,7 @@
       </input>
       <chart>
         <search>
-          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager restart host="rplinux-CM_DMC" Restart peer with guid | timechart $span1$ dc(guid)</query>
+          <query>index=_internal search_group="$group$" source=*splunkd.log* NOT DispatchManager  Restart peer with guid | timechart $span1$ dc(guid)</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
