@@ -1486,7 +1486,7 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
     <panel>
       <html>
                  <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
-                 <a target="_blank" href="skipped_deferred_analysis_v2" class="btn btn-primary">continue investigation by looking at SHC skipped and deferred searches </a>
+                 <a target="_blank" href="skipped_deferred_analysis" class="btn btn-primary">continue investigation by looking at SHC skipped and deferred searches </a>
              </html>
     </panel>
   </row>
