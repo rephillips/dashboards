@@ -183,93 +183,6 @@
     </input>
   </fieldset>
   <row>
-    <panel rejects="$historical$">
-      <title>SHC Member Status</title>
-      <table id="members_table">
-        <title>$totalCountOfMembers$ Members</title>
-        <search base="membersSnapshotSearch">
-          <query>
-fields label role status last_heartbeat ratio unpublished_changes artifact_count
-| eval ratio = if(isnotnull(ratio), ratio, "N/A")
-| eval unpublished_changes = if(isnotnull(unpublished_changes), unpublished_changes, "N/A")
-| eval artifact_count = if(isnotnull(artifact_count), artifact_count, "N/A")
-| `dmc_time_format(last_heartbeat)`
-| `dmc_time_format(last_heartbeat_captain)`
-| eval last_heartbeat = if(isnotnull(last_heartbeat), last_heartbeat, "N/A")
-| rename label as Instance, role as Role, status as Status, last_heartbeat as "Last Heartbeat Sent to Captain", ratio as "Configuration Baseline Consistency", unpublished_changes as "Number of Unpublished Changes", artifact_count as "Artifact Count"
-          </query>
-          <done>
-            <set token="totalCountOfMembers">$job.resultCount$</set>
-          </done>
-          <error>
-            <set token="totalCountOfMembers">N/A</set>
-          </error>
-        </search>
-        <option name="wrap">true</option>
-        <option name="rowNumbers">false</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">cell</option>
-        <option name="count">10</option>
-        <!--<option name="refresh.auto.interval">60</option>-->
-        <option name="refresh.time.visible">false</option>
-        <drilldown>
-          <condition field="Instance">
-            <set token="SHCMemberDrilldown">$click.value2$</set>
-          </condition>
-          <condition field="Configuration Baseline Consistency">
-            <set token="SHCMemberBaselineDrilldown">$row.Instance$</set>
-          </condition>
-          <condition field="*"></condition>
-        </drilldown>
-      </table>
-      <html>
-        <p>Click on instance name to see more details.</p>
-        <p>Click on configuration baseline ratio to see more details about configuration replication. <a href="/help?location=learnmore.shc.confreplication" target="_blank" class="external">Learn More</a>
-        </p>
-      </html>
-    </panel>
-    <panel depends="$SHCMemberDrilldown$">
-      <title>$SHCMemberDrilldown$</title>
-      <table>
-        <search base="membersSnapshotSearch">
-          <query>
-where label == "$SHCMemberDrilldown$"
-| eval elected_captain = if(isnotnull(elected_captain), elected_captain, "N/A")
-| fields - _timediff
-| fields elected_captain guid advertise_restart_required advertise_restart_required_reason delayed_artifacts_to_discard fixup_set pending_job_count replication_count status_counter.Complete status_counter.PendingDiscard peer_scheme_host_port adhoc_searchhead kv_store_host_port replication_port replication_use_ssl site
-| transpose
-| rename column as "Configuration and Status", "row 1" as Value
-          </query>
-        </search>
-        <option name="wrap">true</option>
-        <option name="rowNumbers">false</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="count">20</option>
-        <!--<option name="refresh.auto.interval">60</option>-->
-        <option name="refresh.time.visible">false</option>
-      </table>
-      <html>
-        <a data-unset-token="SHCMemberDrilldown">Close this panel</a>
-      </html>
-    </panel>
-    <panel depends="$SHCMemberBaselineDrilldown$">
-      <title>Configuration Baseline Consistency for: $SHCMemberBaselineDrilldown$</title>
-      <table>
-        <search base="membersSnapshotSearch">
-          <query>
-            where label == "$SHCMemberBaselineDrilldown$"
-            | fields shared_common_baseline no_shared_common_baseline unable_to_connect
-            | rename shared_common_baseline as "Shares Common Baseline With", no_shared_common_baseline as "Does Not Share Common Baseline With", unable_to_connect as "No Response From"
-          </query>
-        </search>
-      </table>
-      <html>
-        <a data-unset-token="SHCMemberBaselineDrilldown">Close this panel</a>
-      </html>
-    </panel>
-  </row>
-  <row>
     <panel>
       <table>
         <search>
@@ -285,13 +198,13 @@ where label == "$SHCMemberDrilldown$"
               | stats count(eval('search_props.mode'=="historical batch" OR 'search_props.mode'=="historical")) as count_hist_search, count(eval('search_props.mode'=="RT" OR 'search_props.mode'=="RT indexed")) as count_rt_search by splunk_server ]
             | join splunk_server type=outer [
               | rest splunk_server_group=dmc_group_search_head splunk_server_group="$group$" /services/server/info
-              | fields splunk_server, numberOfCores, numberOfVirtualCores]
+              | fields splunk_server,version,physicalMemoryMB, numberOfCores, numberOfVirtualCores]
             | eval count_hist_search = if(isnull(count_hist_search), 0, count_hist_search)
             | eval count_rt_search = if(isnull(count_rt_search), 0, count_rt_search)
             | eval hist_concur_vs_limit = count_hist_search." / ".max_hist_scheduled_searches
             | eval rt_concur_vs_limit = count_rt_search." / ".max_rt_scheduled_searches
             | `dmc_get_core_info`
-            | fields splunk_server, core_info, hist_concur_vs_limit, rt_concur_vs_limit, count
+            | fields splunk_server,version, core_info,physicalMemoryMB hist_concur_vs_limit, rt_concur_vs_limit, count
             | rename splunk_server as Instance, core_info AS "CPU Cores (Physical / Virtual)", hist_concur_vs_limit as "Concurrency of Historical Scheduled Report (Running/Limit)", rt_concur_vs_limit as "Concurrency of Real-time Scheduled Report (Running/Limit)", count as "Unique Scheduled Reports"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
@@ -301,6 +214,7 @@ where label == "$SHCMemberDrilldown$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -311,259 +225,8 @@ where label == "$SHCMemberDrilldown$"
     </panel>
   </row>
   <row>
-    <panel depends="$show_member_heartbeat_detail$">
-      <table>
-        <title>Members that exceeded heartbeat timeout</title>
-        <search base="members_heartbeat_timeout_base">
-          <query>
-            fields label, last_heartbeat, last_heartbeat_captain, heartbeat_timeout, status
-            | eval heartbeat_timeout = if(isnotnull(heartbeat_timeout), heartbeat_timeout, "N/A")
-            | `dmc_time_format(last_heartbeat)`
-            | `dmc_time_format(last_heartbeat_captain)`
-            | eval last_heartbeat = if(isnotnull(last_heartbeat), last_heartbeat, "N/A")
-            | rename label as Member, last_heartbeat as "Last Heartbeat Sent to Captain", last_heartbeat_captain as "Last Heartbeat Received by Captain", heartbeat_timeout as "Heartbeat Timeout (sec)", status as "Status"
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </table>
-      <html>
-        <a data-unset-token="show_member_heartbeat_detail">Close this panel</a>
-      </html>
-    </panel>
-    <panel depends="$show_member_peer_inconsistency_detail$">
-      <table>
-        <title>Search Head Cluster Members and Peers</title>
-        <search base="member_peer_consistency_base"></search>
-        <option name="drilldown">none</option>
-      </table>
-      <html>
-        <a data-unset-token="show_member_peer_inconsistency_detail">Close this panel</a>
-      </html>
-    </panel>
-  </row>
-  <row>
-    <panel rejects="$historical$">
-      <title>Ad hoc + Scheduled Searches ($count_total_adhoc_scheduled_search$ Running) (Running/Limit)</title>
-      <single>
-        <search base="search_concurrency_vs_limits_base">
-          <query>
-            eval total_historical_vs_limit = count_total_hist."/".max_hist_searches
-            | fields total_historical_vs_limit
-          </query>
-        </search>
-        <option name="colorMode">none</option>
-        <option name="drilldown">all</option>
-        <option name="height">80</option>
-        <option name="underLabel">Historical</option>
-        <option name="useColors">0</option>
-        <drilldown>
-          <set token="show_total_hist_search_details">true</set>
-          <unset token="show_total_rt_search_details"></unset>
-          <unset token="show_hist_search_details"></unset>
-          <unset token="show_rt_search_details"></unset>
-          <unset token="show_summarization_search_details"></unset>
-        </drilldown>
-      </single>
-      <single>
-        <search base="search_concurrency_vs_limits_base">
-          <query>
-            eval total_rt_vs_limit = count_total_rt."/".max_rt_searches
-            | fields total_rt_vs_limit
-          </query>
-        </search>
-        <option name="underLabel">Real-time</option>
-        <option name="height">80</option>
-        <option name="drilldown">all</option>
-        <drilldown>
-          <unset token="show_total_hist_search_details"></unset>
-          <set token="show_total_rt_search_details">true</set>
-          <unset token="show_hist_search_details"></unset>
-          <unset token="show_rt_search_details"></unset>
-          <unset token="show_summarization_search_details"></unset>
-        </drilldown>
-      </single>
-    </panel>
-    <panel rejects="$historical$">
-      <title>Scheduled Searches ($count_total_scheduled_search$ Running) (Running/Limit)</title>
-      <single>
-        <search base="search_concurrency_vs_limits_base">
-          <query>
-            eval scheduled_vs_total_hist_scheduled_search_limit = count_hist_scheduled_search."/".max_hist_scheduled_searches
-            | fields scheduled_vs_total_hist_scheduled_search_limit
-          </query>
-        </search>
-        <option name="drilldown">all</option>
-        <option name="height">80</option>
-        <option name="underLabel">Historical</option>
-        <drilldown>
-          <unset token="show_total_hist_search_details"></unset>
-          <unset token="show_total_rt_search_details"></unset>
-          <set token="show_hist_search_details">true</set>
-          <unset token="show_rt_search_details"></unset>
-          <unset token="show_summarization_search_details"></unset>
-        </drilldown>
-      </single>
-      <single>
-        <search base="search_concurrency_vs_limits_base">
-          <query>
-            eval scheduled_vs_total_rt_scheduled_search_limit = count_rt_scheduled_search."/".max_rt_scheduled_searches
-            | fields scheduled_vs_total_rt_scheduled_search_limit
-          </query>
-        </search>
-        <option name="underLabel">Real-time</option>
-        <option name="height">80</option>
-        <option name="drilldown">all</option>
-        <drilldown>
-          <unset token="show_total_hist_search_details"></unset>
-          <unset token="show_total_rt_search_details"></unset>
-          <unset token="show_hist_search_details"></unset>
-          <set token="show_rt_search_details">true</set>
-          <unset token="show_summarization_search_details"></unset>
-        </drilldown>
-      </single>
-      <single>
-        <search base="search_concurrency_vs_limits_base">
-          <query>
-            eval scheduled_vs_total_auto_summary_search_limit = count_auto_summary_search."/".max_auto_summary_searches
-            | fields scheduled_vs_total_auto_summary_search_limit
-          </query>
-        </search>
-        <option name="underLabel">Summarization</option>
-        <option name="height">80</option>
-        <option name="drilldown">all</option>
-        <drilldown>
-          <unset token="show_total_hist_search_details"></unset>
-          <unset token="show_total_rt_search_details"></unset>
-          <unset token="show_hist_search_details"></unset>
-          <unset token="show_rt_search_details"></unset>
-          <set token="show_summarization_search_details">true</set>
-        </drilldown>
-      </single>
-    </panel>
-  </row>
-  <row>
-    <panel rejects="$historical$">
-      <html>
-        <p>
-          Click value above to see more details.
-        </p>
-        <p>
-          Search concurrency limits can be set in limits.conf. <a href="/help?location=learnmore.dmc.shc.concurrency" target="_blank" class="external">Learn More</a>
-        </p>
-      </html>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$show_total_hist_search_details$" rejects="$historical$">
-      <title>Ad hoc + Scheduled Historical Search Concurrency Details</title>
-      <table>
-        <search base="snapshot_search_concurrency_base">
-          <query>
-            where ('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration" OR 'search_props.type'=="ad-hoc") AND ('search_props.mode'=="historical" OR 'search_props.mode'=="historical batch")
-            | fields search_props.sid, search_props.label, splunk_server, search_props.app, search_props.user, search_props.type, search_props.mode, search_props.role, mem_used, pct_cpu, elapsed
-            | eval mem_used = round(mem_used, 0)
-            | eval pct_cpu = round(pct_cpu, 0)
-            | eval elapsed = round(elapsed, 0)
-            | rename search_props.sid as SID, search_props.label as "Search Name", splunk_server as Member, search_props.app as App, search_props.user as User, search_props.type as Type, search_props.mode as Mode, search_props.role as Role, mem_used as "Memory Used (MB)", pct_cpu as "CPU Usage (%)", elapsed as "Time Elapsed (sec)"
-          </query>
-        </search>
-        <option name="drilldown">cell</option>
-      </table>
-      <html>
-        <a data-unset-token="show_total_hist_search_details">Close this panel</a>
-      </html>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$show_total_rt_search_details$" rejects="$historical$">
-      <title>Ad hoc + Scheduled Real-time Search Concurrency Details</title>
-      <table>
-        <search base="snapshot_search_concurrency_base">
-          <query>
-            where ('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration" OR 'search_props.type'=="ad-hoc") AND ('search_props.mode'=="RT" OR 'search_props.mode'=="RT indexed")
-            | fields search_props.sid, search_props.label, splunk_server, search_props.app, search_props.user, search_props.type, search_props.mode, search_props.role, mem_used, pct_cpu, elapsed
-            | eval mem_used = round(mem_used, 0)
-            | eval pct_cpu = round(pct_cpu, 0)
-            | eval elapsed = round(elapsed, 0)
-            | rename search_props.sid as SID, search_props.label as "Search Name", splunk_server as Member, search_props.app as App, search_props.user as User, search_props.type as Type, search_props.mode as Mode, search_props.role as Role, mem_used as "Memory Used (MB)", pct_cpu as "CPU Usage (%)", elapsed as "Time Elapsed (sec)"
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </table>
-      <html>
-        <a data-unset-token="show_total_rt_search_details">Close this panel</a>
-      </html>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$show_hist_search_details$" rejects="$historical$">
-      <title>Scheduled Historical Search Concurrency Details</title>
-      <table>
-        <search base="snapshot_search_concurrency_base">
-          <query>
-            where ('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration") AND ('search_props.mode'=="historical" OR 'search_props.mode'=="historical batch")
-            | fields search_props.sid, search_props.label, splunk_server, search_props.app, search_props.user, search_props.type, search_props.mode, search_props.role, mem_used, pct_cpu, elapsed
-            | eval mem_used = round(mem_used, 0)
-            | eval pct_cpu = round(pct_cpu, 0)
-            | eval elapsed = round(elapsed, 0)
-            | rename search_props.sid as SID, search_props.label as "Search Name", splunk_server as Member, search_props.app as App, search_props.user as User, search_props.type as Type, search_props.mode as Mode, search_props.role as Role, mem_used as "Memory Used (MB)", pct_cpu as "CPU Usage (%)", elapsed as "Time Elapsed (sec)"
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </table>
-      <html>
-        <a data-unset-token="show_hist_search_details">Close this panel</a>
-      </html>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$show_rt_search_details$" rejects="$historical$">
-      <title>Scheduled Real-time Concurrency Search Details</title>
-      <table>
-        <search base="snapshot_search_concurrency_base">
-          <query>
-            where ('search_props.type'=="scheduled" OR 'search_props.type'=="summary indexing" OR 'search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration") AND ('search_props.mode'=="RT" OR 'search_props.mode'=="RT indexed")
-            | fields search_props.sid, search_props.label, splunk_server, search_props.app, search_props.user, search_props.type, search_props.mode, search_props.role, mem_used, pct_cpu, elapsed
-            | eval mem_used = round(mem_used, 0)
-            | eval pct_cpu = round(pct_cpu, 0)
-            | eval elapsed = round(elapsed, 0)
-            | rename search_props.sid as SID, search_props.label as "Search Name", splunk_server as Member, search_props.app as App, search_props.user as User, search_props.type as Type, search_props.mode as Mode, search_props.role as Role, mem_used as "Memory Used (MB)", pct_cpu as "CPU Usage (%)", elapsed as "Time Elapsed (sec)"
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </table>
-      <html>
-        <a data-unset-token="show_rt_search_details">Close this panel</a>
-      </html>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$show_summarization_search_details$" rejects="$historical$">
-      <title>Summarization Search Details</title>
-      <table>
-        <search base="snapshot_search_concurrency_base">
-          <query>
-            where ('search_props.type'=="report acceleration" OR 'search_props.type'=="datamodel acceleration")
-            | fields search_props.sid, search_props.label, splunk_server, search_props.app, search_props.user, search_props.type, search_props.mode, search_props.role, mem_used, pct_cpu, elapsed
-            | eval mem_used = round(mem_used, 0)
-            | eval pct_cpu = round(pct_cpu, 0)
-            | eval elapsed = round(elapsed, 0)
-            | rename search_props.sid as SID, search_props.label as "Search Name", splunk_server as Member, search_props.app as App, search_props.user as User, search_props.type as Type, search_props.mode as Mode, search_props.role as Role, mem_used as "Memory Used (MB)", pct_cpu as "CPU Usage (%)", elapsed as "Time Elapsed (sec)"
-          </query>
-        </search>
-        <option name="drilldown">none</option>
-      </table>
-      <html>
-        <a data-unset-token="show_summarization_search_details">Close this panel</a>
-      </html>
-    </panel>
-  </row>
-  <row>
-    <panel></panel>
-  </row>
-  <row>
     <panel>
-      <title>Number of scheduled searches configured &amp; enabled</title>
+      <title>scheduled searches &amp; data model accelerations</title>
       <single>
         <search>
           <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$  | search  disabled=0 is_scheduled=1| table title  cron_schedule dispatch.earliest_time dispatch.latest_time auto_summarize  action.email realtime_schedule eai:acl.app eai:acl.owner schedule_priority auto_summarize.dispatch.earliest_time auto_summarize.dispatch.latest_time allow_skew  action.summary_index | append [ | rest /servicesNS/-/-/data/models splunk_server=$captain_name$ | search acceleration=1 | table title acceleration.cron_schedule acceleration.earliest_time acceleration.max_time dataset.type eai:acl.app eai:acl.owner  | rename acceleration.cron_schedule as acceleration_cron_schedule acceleration.earliest_time as acceleration_et acceleration.max_time as acceleration_max_time dataset.type as dataset_type eai:acl.app as app eai:acl.owner as owner] | stats count</query>
@@ -713,11 +376,10 @@ where label == "$SHCMemberDrilldown$"
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">10</option>
+        <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -765,19 +427,21 @@ where label == "$SHCMemberDrilldown$"
       </input>
       <chart>
         <title>shc captaincy timeline</title>
+        <search>
+          <query>`dmc_set_index_internal` sourcetype=splunkd group=searchscheduler search_group=dmc_group_search_head search_group="$group$"
+| eval state=if(delegated&gt;0, "captain", "non-captain")
+| search state="captain"
+| timechart $span1$ distinct_count(state) by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
         <search type="annotation">
           <query>`dmc_set_index_internal` search_group=$group$ sourcetype=splunkd component=Metrics group=captainstability upgrades_to_captain=1 | eval msg="Became SHC Captain"
 | eval annotation_label = msg
 | eval annotation_category = host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
-        </search>
-        <search>
-          <query>`dmc_set_index_internal` sourcetype=splunkd group=searchscheduler search_group=dmc_group_search_head search_group="$group$"
-| timechart $span1$ sum(delegated) as delegated by host</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -1140,6 +804,21 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
   </row>
   <row>
     <panel>
+      <html>
+ 
+  <p/>
+  <b>peak_scheduler_concurrency:</b> = The peak_scheduler_concurrency is calculated based on _introspection logs is counting active searches (PIDs) which should correspond to deleg_size.
+    <p/>
+<b>captain_computed_scheduler_concurrency:</b> = The captain_computed_scheduler_concurrency is being calculated as sched_size + deleg_size where sched_size is number of searches yet to be dispatched and deleg_size is the searches that are already running in the SHC.
+ <p/>
+  _introspection log data is logged every 10 sec and metrics.log every 30 sec so it may not reflect short lived search processes. As a result, we don't expect to see the two metrics track each other exactly, however we can use this to spot large discrepancies in the two.
+  <p/>
+
+</html>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>Captain Computed Concurrency (metrics.log) vs Concurrent Running Scheduled Search Processes (peak_scheduler_concurrency) (introspection)</title>
       <chart>
         <search>
@@ -1182,16 +861,16 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
   </row>
   <row>
     <panel>
-      <title>time spent in shcluster/member/delegatejob endpoint of shc members</title>
+      <title>time spent (&gt;1000ms) in shcluster/member/delegatejob endpoint of shc members</title>
       <table>
-        <title>spent &gt; 1000 ms</title>
+        <title>spent represents how long it took to create the search artifact directory on the member</title>
         <search>
           <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*splunkd_access.log* /shcluster/member/delegatejob/ spent&gt;1000  | stats values(spent) as spent_ms by host uri_path</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">3</option>
+        <option name="count">1</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
@@ -1200,66 +879,6 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <table>
-        <title>Number of Searches scheduled to run by scheduler on SHC captain node : $captain_name$ by next_scheduled_time ( excluding accelerated data models)</title>
-        <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ | where is_scheduled=1 | search disabled=0 | search next_scheduled_time!="" | stats count by  next_scheduled_time | rename count as "concurrent scheduled searches configured"| join dmc_group_search_head search_group [| rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head "/services/server/status/limits/search-concurrency?cluster_wide_quota=1"
-              | stats max(max_hist_scheduled_searches) as "scheduler concurrency limit"] | sort -"concurrent scheduled searches configured"</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-          <refresh>30s</refresh>
-          <refreshType>delay</refreshType>
-        </search>
-        <option name="count">10</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">cell</option>
-        <option name="percentagesRow">false</option>
-        <option name="rowNumbers">false</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-        <drilldown>
-          <condition field="next_scheduled_time">
-            <set token="next_scheduled_time">$click.value$</set>
-          </condition>
-          <condition field="*"></condition>
-        </drilldown>
-      </table>
-      <html>
-    <p>Click on next_scheduled_time to see more details.</p>
-  </html>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$next_scheduled_time$">
-      <table>
-        <title>Detail of searches scheduled to run at: $next_scheduled_time$</title>
-        <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server="$captain_name$" | where is_scheduled=1 | search disabled=0 | search next_scheduled_time="$next_scheduled_time$" | stats count by  title next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| fields title next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| rename title as savedsearch_name | join savedsearch_name [search index=_internal search_group=dmc_group_search_head search_group="$group$" sourcetype=scheduler  status=*  dispatch_time=* 
-| eval runtime_delay= (dispatch_time-scheduled_time) | stats avg(runtime_delay) as avg_runtime_delay avg(run_time) as avg_runtime by savedsearch_name | eval avg_runtime_delay=round(avg_runtime_delay,0)| eval avg_runtime=round(avg_runtime,0) | rename avg_runtime_delay as "avg_runtime_delay(sec)" avg_runtime as avg_runtime(sec) | sort - "avg_runtime(sec)"]</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="count">10</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">cell</option>
-        <option name="percentagesRow">false</option>
-        <option name="rowNumbers">true</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-        <drilldown>
-          <set token="cron_schedule">$click.value2$</set>
-          <link target="_blank">https://crontab.guru/#$click.value2$</link>
-        </drilldown>
-      </table>
-      <html>
-    <a data-unset-token="next_scheduled_time">Close this panel</a>
-  </html>
     </panel>
   </row>
   <row>
@@ -1282,10 +901,9 @@ cron_type!=0,lower_bound . "-" . upper_bound . "/" . cron_type .  " * * * *"
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">10</option>
-        <option name="dataOverlayMode">heatmap</option>
+        <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
