@@ -1,4 +1,5 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
+  <label></label>
   <search id="members_heartbeat_timeout_base" base="membersSnapshotSearch">
     <query>
           fields label, status, last_heartbeat, last_heartbeat_captain
@@ -225,7 +226,13 @@
   </row>
   <row>
     <panel>
-      <title>cluster-wide search concurrency limits</title>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Search Concurrency Limits</span>  </b>
+        
+        </h1>
+      </html>
       <table>
         <search>
           <query>| rest  splunk_server=$captain_name$ "/services/server/status/limits/search-concurrency?cluster_wide_quota=1" | table max* | transpose | rename column as "search_type" | rename "row 1" as "concurrency limit"  | table search_type  "concurrency limit" | sort -"concurrency limit"</query>
@@ -570,7 +577,19 @@ by Cron_Schedule
   </row>
   <row>
     <panel>
-      <title>number of scheduled searches configured for each minute in the hour for the last 60m</title>
+      
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Scheduled Search Distribution</span>  </b>
+        </h1>
+
+        <b>Description:</b> Groups scheduled searches by cron schedule time for the last 60m</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> Use to identify periods with very high number of scheduled searches and adjust cron schedule away from hot minutes or use allow_skew and schedule windows</p>
+
+      </html>
       <chart>
         <search>
           <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$
@@ -655,6 +674,22 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
   </row>
   <row>
     <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Average search runtime</span>  </b>
+        </h1>
+
+        <b>Description:</b> Calculates average runtime of completed searches</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> Use to identify trends in increased search runtime</p>
+
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <input type="multiselect" token="savedsearch_name" searchWhenChanged="true">
         <label>saved search name</label>
         <choice value="*">All</choice>
@@ -689,19 +724,6 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
         <default>minspan=10s</default>
         <initialValue>minspan=10s</initialValue>
       </input>
-      <html>
-        <h1>
-          <b>
-            <span style="color: #ED179F">Average search runtime</span>  </b>
-        
-        </h1>
-
-        <b>Description:</b> Calculates average runtime of completed searches</html>
-      <html>
-        <b>Recommended Action:</b> 
-          <p> Use to identify trends in increased search runtime</p>
-
-      </html>
       <chart>
         <search>
           <query>index=_audit search_group=dmc_group_search_head search_group="$group$" source=audittrail search_id=* NOT user="splunk-system-user" NOT user="n/a" NOT search_id=rt_* action=search info=completed $savedsearch_name$
@@ -805,9 +827,20 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
   </row>
   <row>
     <panel>
-      <title>SH idle cpu for $group$</title>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Search Head idle cpu</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> Shows minimum idle cpu % across all search heads
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> If minimum idle cpu % is very low, review Monitoring Console Resource Usage views.</p>
+          </html>
       <chart>
-        <title>minimum idle cpu  %</title>
         <search>
           <query>index=_introspection search_group=dmc_group_search_head search_group="$group$"   source=*resource_usage.log*   OR  hostwide | timechart span=30s  min(data.cpu_idle_pct)</query>
           <earliest>$time.earliest$</earliest>
@@ -850,9 +883,21 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
       </chart>
     </panel>
     <panel>
-      <title>Search Head disk latency for $group$</title>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Search Head disk latency</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> The average time (in milliseconds) for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> Use to review search head disk latency.</p>
+          </html>
       <chart>
-        <title>The average time (in milliseconds) for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.</title>
+        <title></title>
         <search>
           <query>index=_introspection search_group=dmc_group_search_head search_group="$group$"  source=*resource_usage.log* component=IOstats data.avg_total_ms&gt;0 "data.mount_point"=*| timechart minspan=10s limit=60 max(data.avg_total_ms) by data.mount_point</query>
           <earliest>$time.earliest$</earliest>
@@ -897,9 +942,8 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
   </row>
   <row>
     <panel>
-      <title>indexer idle cpu for $dmc_group$</title>
       <input type="dropdown" searchWhenChanged="true" token="dmc_group">
-        <label>Group</label>
+        <label>Select Index Cluster</label>
         <showClearButton>false</showClearButton>
         <selectFirstChoice>false</selectFirstChoice>
         <search>
@@ -919,8 +963,24 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
           <latest>now</latest>
         </default>
       </input>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Indexer idle cpu</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> Shows minimum idle cpu % across all indexers
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> If minimum idle cpu % is very low, review Monitoring Console Resource Usage views.</p>
+          </html>
       <chart>
-        <title>minimum idle cpu  %</title>
         <search>
           <query>index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"  source=*resource_usage.log*   hostwide | timechart span=30s  min(data.cpu_idle_pct)</query>
           <earliest>$time2.earliest$</earliest>
@@ -963,9 +1023,20 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
       </chart>
     </panel>
     <panel>
-      <title>indexer disk latency for $dmc_group$</title>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Indexer disk latency</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> The average time (in milliseconds) for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> Use to review Indexer disk latency.(ideal latency ~5-10ms for mountpoint where indexed data resides)</p>
+          </html>
       <chart>
-        <title>The average time (in milliseconds) for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.</title>
         <search>
           <query>index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$" source=*resource_usage.log* component=IOstats data.avg_total_ms&gt;0 "data.mount_point"=*| timechart minspan=10s limit=60 max(data.avg_total_ms) by data.mount_point | eval ideal_latency=10</query>
           <earliest>$time2.earliest$</earliest>
@@ -1011,9 +1082,20 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
   </row>
   <row>
     <panel>
-      <title>Cache Hits/Misses (Only for SmartStore enabled indexes)</title>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">S2 Cache Hits/Misses</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> When a search needs a bucket and it's already in cache, that's a hit. If the bucket needs to be downloaded, that's a miss. Applies only to SmartStore enabled indexes</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> High number of misses could be due to long look back searches or insufficient cache size on indexers </p>
+
+      </html>
       <chart>
-        <title>When a search needs a bucket and it's already in cache, that's a hit. If the bucket needs to be downloaded, that's a miss.</title>
         <search>
           <query>index=_internal search_group="dmc_group_indexer" search_group="$dmc_group$"   group=cachemgr_bucket source=*metrics.log | timechart count(cache_hit) as Hits count(cache_miss) as Misses</query>
           <earliest>$time2.earliest$</earliest>
@@ -1055,9 +1137,21 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
       </chart>
     </panel>
     <panel>
-      <title>Cache Thrash by Index</title>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">S2 Cache Thrash by Index</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> This is the percentage of bucket downloads that are repeats. This happens when a bucket is downloaded for a search, evicted based on policy, and then needed by a search again. "Excessively Repeated Downloads" are buckets that have been downloaded more than 10 times.</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> High number of misses could be due to long look back searches or insufficient cache size on indexers </p>
+
+      </html>
       <chart>
-        <title>This is the percentage of bucket downloads that are repeats. This happens when a bucket is downloaded for a search, evicted based on policy, and then needed by a search again. "Excessively Repeated Downloads" are buckets that have been downloaded more than 10 times.</title>
+        <title></title>
         <search>
           <query>`dmc_set_index_internal` search_group="dmc_group_indexer" search_group="$dmc_group$"  source=*splunkd.log CacheManager AND TERM(action=download) AND TERM(status=succeeded) AND download_set="*journal*"
               | rex field=cache_id ".*\|(?&lt;customer_index&gt;.*)~.*~.*\|"
@@ -1109,7 +1203,6 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
   </row>
   <row>
     <panel>
-      <title>event distribution across indexers</title>
       <input type="time" token="time3" searchWhenChanged="true">
         <label></label>
         <default>
@@ -1117,6 +1210,19 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
           <latest>now</latest>
         </default>
       </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Ingested Data Distribution</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> Shows ingested data distribution across indexers</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> Use to identify large imbalance of data across indexers. Use Monitoring Console view Indexing Performance: Instance to further diagnose </p>
+
+      </html>
       <table>
         <search>
           <query>index=_internal search_group="dmc_group_indexer" search_group="$dmc_group$"   source=*metrics.log* group=tcpin_connections | eval sourceHost=if(isnull(hostname),sourceHost,hostname)
@@ -1206,7 +1312,47 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
   </row>
   <row>
     <panel>
-      <title>tstats event count by index</title>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Bucket distribution across indexers</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> Shows bucket distribution across indexers</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> Use to identify large imbalance of buckets and determine if a primary rebalance or data rebalance should be performed</p>
+
+      </html>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/cluster/master/peers | fields label, is_searchable, status, site, bucket_count,primary_count, host_port_pair, last_heartbeat, replication_port, base_generation_id, title, bucket_count_by_index.*
+            | eval is_searchable = if(is_searchable == 1 or is_searchable == "1", "Yes", "No")
+            | `dmc_time_format(last_heartbeat)`
+            | sort - last_heartbeat
+            | search label="***"
+            | search is_searchable="*"
+            | search status="*"
+            | search site="*"
+            | fields label, is_searchable, status, site, bucket_count,primary_count
+            | rename label as Peer, is_searchable as "Fully Searchable", status as Status, site as Site, bucket_count as Buckets, primary_count as Primaries</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">true</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <input type="multiselect" token="index" searchWhenChanged="true">
         <label>select index</label>
         <valuePrefix>index=</valuePrefix>
@@ -1228,6 +1374,19 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
           <latest>now</latest>
         </default>
       </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Event count by index</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> Timechart of event count by index</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> Use to identify trends in increased data ingestion</p>
+
+      </html>
       <chart>
         <search>
           <query>| tstats count WHERE ($index$) BY index _time span=5m prestats=t
@@ -1269,6 +1428,58 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>longest running searches</title>
+      <input type="time" token="time6" searchWhenChanged="true">
+        <label></label>
+        <default>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </default>
+      </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Long Running Searches</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> Long running searches on the indexers</html>
+      <html>
+        <b>Recommended Action:</b> 
+          <p> Use to target long running searches for optimization</p>
+
+      </html>
+      <table>
+        <search>
+          <query>`dmc_audit_get_searches_for_groups($dmc_group$)`
+      | stats min(_time) as _time, values(user) as user, max(total_run_time) as total_run_time, first(search) as search, first(search_type) as search_type, first(apiStartTime) as apiStartTime, first(apiEndTime) as apiEndTime by search_id, host
+      | where isnotnull(search) AND true() | search user="*" search="*"
+            | eval earliest = case(like(apiStartTime, "%ZERO_TIME%") AND like(apiEndTime, "%ZERO_TIME%"), "all time", like(apiStartTime, "%ZERO_TIME%"), "-", 1 == 1, apiStartTime )
+            | eval latest = case(like(apiStartTime, "%ZERO_TIME%") AND like(apiEndTime, "%ZERO_TIME%"), "all time", like(apiEndTime, "%ZERO_TIME%"), "-", 1 == 1, apiEndTime ) 
+            | `dmc_time_format(_time)`
+            | stats max(total_run_time) as total_run_time by search, _time, earliest, latest, search_type, user, host, search_id
+            | sort - total_run_time 
+            | eval total_run_time = if(isnotnull(total_run_time), total_run_time, "-")
+            | fields search, total_run_time, _time, earliest, latest, search_type, user, host, search_id
+            | rename search as "Report Name/Search String", total_run_time as "Search Runtime", _time as "Search Start", earliest as "Earliest Time", latest as "Latest Time", search_type as Type, user as "User", host as "Host", search_id as SID
+            | fieldformat "Search Runtime" = `dmc_convert_runtime('Search Runtime')`</query>
+          <earliest>$time6.earliest$</earliest>
+          <latest>$time6.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
   <row>
