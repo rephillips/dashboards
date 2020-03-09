@@ -1,5 +1,5 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
-  <label></label>
+  <label>overview</label>
   <search id="members_heartbeat_timeout_base" base="membersSnapshotSearch">
     <query>
           fields label, status, last_heartbeat, last_heartbeat_captain
@@ -577,7 +577,6 @@ by Cron_Schedule
   </row>
   <row>
     <panel>
-      
       <html>
         <h1>
           <b>
@@ -1022,6 +1021,64 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
         <option name="trellis.size">medium</option>
       </chart>
     </panel>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Indexer Load Average</span>  </b>
+        
+        </h1>
+
+        <b>Description:</b> Shows normalized 1m load avg based on physical cpu core count
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>Sustained values above 1 are concerning (1=100% cpu system utilization), review Monitoring Console Resource Usage views to determine the processes consuming the most cpu.</p>
+          </html>
+    
+      <chart>
+        <search>
+          <query>index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"    source=*resource_usage.log*  | timechart span=10s  max(data.normalized_load_avg_1min) by host useother=f | eval ceiling=1</query>
+          <earliest>$time2.earliest$</earliest>
+          <latest>$time2.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
     <panel>
       <html>
         <h1>
@@ -1486,7 +1543,7 @@ search="is_scheduled=1" search="disabled=0" earliest_time=-1h@m latest_time=now
     <panel>
       <html>
                  <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
-                 <a target="_blank" href="skipped_deferred_search_analysis" class="btn btn-primary">continue investigation by looking at SHC skipped and deferred searches </a>
+                 <a target="_blank" href="skipped_deferred_analysis_v2" class="btn btn-primary">continue investigation by looking at SHC skipped and deferred searches </a>
              </html>
     </panel>
   </row>
