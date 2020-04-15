@@ -1,5 +1,14 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
-  <label>SHC_Search_Knowledge_Bundle</label>
+  <label>SHC: Search Knowledge Bundle</label>
+  <search>
+    <done>
+      <set token="optimizedSearch">$job.optimizedSearch$</set>
+    </done>
+    <query>$dma_search|s$</query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
   <search id="members_heartbeat_timeout_base" base="membersSnapshotSearch">
     <query>
           fields label, status, last_heartbeat, last_heartbeat_captain
@@ -175,7 +184,7 @@
     <input type="time" token="time" searchWhenChanged="true">
       <label></label>
       <default>
-        <earliest>-4h@m</earliest>
+        <earliest>-60m@m</earliest>
         <latest>now</latest>
       </default>
     </input>
@@ -365,7 +374,7 @@
       <title>Distributed Peer Heartbeat - Peer Count per SH (SH heartbeats peers every 5m)</title>
       <chart>
         <search>
-          <query>index=_internal search_group=$group$ search_group=dmc_group_search_head source=*metrics.log* group=search_health_metrics name=distributed_peer_heartbeat | timechart span=5m max(Peer_Count) as peer_count by host</query>
+          <query>index=_internal search_group=$group$ search_group=dmc_group_search_head source=*metrics.log* group=search_health_metrics name=distributed_peer_heartbeat | timechart span=5m max(Peer_Count) as peer_count by host limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -377,8 +386,8 @@
         <option name="charting.axisTitleY2.visibility">visible</option>
         <option name="charting.axisX.abbreviation">none</option>
         <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">auto</option>
-        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">log</option>
         <option name="charting.axisY2.abbreviation">none</option>
         <option name="charting.axisY2.enabled">0</option>
         <option name="charting.axisY2.scale">inherit</option>
@@ -393,7 +402,7 @@
         <option name="charting.chart.style">shiny</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">1</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
         <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
         <option name="charting.legend.mode">standard</option>
         <option name="charting.legend.placement">right</option>
@@ -437,7 +446,7 @@
     [| rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/shcluster/captain/info 
     | dedup peer_scheme_host_port 
     | fields label 
-    | rename label as "shc_captain"]</query>
+    | rename label as "shc_captain"] | sort -timestamp</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -484,10 +493,20 @@
   </row>
   <row>
     <panel>
-      <title>SHC members view of bundle versions on each peer</title>
+      <title>peer side knowledge bundle receive msgs</title>
+      <input type="dropdown" token="SH_id" searchWhenChanged="true">
+        <label>SH id filter</label>
+        <fieldForLabel>SH_id</fieldForLabel>
+        <fieldForValue>SH_id</fieldForValue>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" source=*splunkd_access.log*  *bundle* method=POST /services/receivers/bundle* | rex "\/services\/receivers\/(?&lt;type&gt;\S+)\/(?&lt;SH_id&gt;\S+)\s+HTTP"  | table _time host method type SH_id bytes spent clientip status | dedup SH_id | table SH_id</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
       <table>
         <search>
-          <query>|rest splunk_server_group=$group$ splunk_server_group=dmc_group_search_head /services/search/distributed/peers  | rex field=bundle_isIndexing "\w\s-\s(?&lt;truefalse&gt;\w+)" |stats values(bundle_versions) as "bundle versions"  dc(bundle_versions) as "bundle versions on indexer" by  status version splunk_server host guid | rename guid as "indexer guid" splunk_server as search_head host as indexer</query>
+          <query>index=_internal search_group="dmc_group_indexer" source=*splunkd_access.log*  *bundle* method=POST /services/receivers/bundle* | rex "\/services\/receivers\/(?&lt;type&gt;\S+)\/(?&lt;SH_id&gt;\S+)\s+HTTP" | search SH_id="$SH_id$" | table _time host method type SH_id bytes spent clientip status</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -501,6 +520,51 @@
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>timechart peer side knowledge bundle receive msgs</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" source=*splunkd_access.log*  *bundle* method=POST /services/receivers/bundle* | rex "\/services\/receivers\/(?&lt;type&gt;\S+)\/(?&lt;SH_id&gt;\S+)\s+HTTP" | search SH_id="$SH_id$" | eval type_SH=SH_id."::".type | timechart dc(SH_id) by type_SH limit=0</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
     </panel>
   </row>
   <row>
@@ -556,6 +620,54 @@
         <option name="wrap">true</option>
       </table>
     </panel>
+    <panel>
+      <title>Datamodel searches which contain lookups (don't blacklist these lookups from the knowledge bundle)</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=dmc_searchheadclustergroup_shcluster1_new /services/datamodel/acceleration| fields title search | eval contains_lookup=if(like(search, "%lookup%"),1,0) | eval contains_lookup=case(contains_lookup=1,"yes",contains_lookup=0,"no")| table title search contains_lookup | search contains_lookup=yes</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>macros which include lookups (need to use macro stanza name to search DM searches)</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=dmc_searchheadclustergroup_shcluster1_new splunk_server_group=dmc_group_search_head /services/configs/conf-macros | search definition=*lookup*    | table splunk_server eai:acl.app title  definition | rename eai:acl.app as app title as stanza splunk_server as shc_captain
+
+
+
+
+
+| join shc_captain 
+    [| rest splunk_server_group=dmc_searchheadclustergroup_shcluster1_new splunk_server_group=dmc_group_search_head /services/shcluster/captain/info 
+    | dedup peer_scheme_host_port 
+    | fields label 
+    | rename label as "shc_captain"]</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
   </row>
   <row>
     <panel>
@@ -567,11 +679,10 @@
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">100</option>
+        <option name="count">1</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -580,116 +691,42 @@
   </row>
   <row>
     <panel>
-      <title>knowledge bundle upload to peers from captain</title>
-      <chart>
-        <title>on captain set DistributedBundleReplicationManager to INFO so we can see frequency of bundle replication</title>
+      <title>Datamodel Acceleration Searches (does this endpoint only return DMAs in the search app? )</title>
+      <table>
         <search>
-          <query>index=_internal search_group=$group$ search_group=dmc_group_search_head source=*splunkd.log* component=*distributed* stream upload bundle to peer | timechart span=1m dc(uri) as peers max(uploaded_bytes) as uploaded_bytes by host</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
+          <query>| rest splunk_server=$captain_name$ /services/datamodel/acceleration | fields title eai:acl.app search  | rename eai:acl.app as app</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.text"># of indexers bundle was uploaded to</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">1</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">area</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.overlayFields">"uploaded_bytes: rplinux-SH3"</option>
-        <option name="charting.chart.showDataLabels">all</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
         <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
   <row>
     <panel>
-      <title>average search runtime</title>
-      <input type="time" token="field1">
-        <label></label>
-        <default>
-          <earliest>-24h@h</earliest>
-          <latest>now</latest>
-        </default>
+      <title>paste DMA search into dma_search box above to execute and produce the optimizedSearch to see if any lookups are present</title>
+      <input type="text" token="dma_search" searchWhenChanged="true">
+        <label>enter dma search</label>
       </input>
-      <input type="dropdown" token="span1" searchWhenChanged="true">
-        <label>span</label>
-        <choice value="minspan=10s">auto</choice>
-        <choice value="span=1m">1m</choice>
-        <choice value="span=15m">15m</choice>
-        <choice value="span=1h">1h</choice>
-        <choice value="span=1d">1d</choice>
-        <default>minspan=10s</default>
-        <initialValue>minspan=10s</initialValue>
-        <fieldForLabel>span</fieldForLabel>
-        <fieldForValue>span</fieldForValue>
-      </input>
-      <chart>
+      <table>
         <search>
-          <query>index=_audit source=audittrail search_group=$group$ search_group=dmc_group_search_head search_id=* NOT user="splunk-system-user" NOT user="n/a" NOT search_id=rt_* info=completed 
-| timechart $span1$ avg(total_run_time) AS avg 
-| eval avg=round(avg,2)</query>
-          <earliest>$field1.earliest$</earliest>
-          <latest>$field1.latest$</latest>
+          <query>| makeresults | eval optimizedSearch=($optimizedSearch|s$)    | eval contains_lookup=if(like(optimizedSearch, "%lookup%"),1,0) | eval contains_lookup=case(contains_lookup=1,"yes",contains_lookup=0,"no")| table  optimizedSearch contains_lookup</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">column</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
         <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
+      </table>
     </panel>
   </row>
 </form>
