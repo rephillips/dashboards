@@ -1,0 +1,1037 @@
+<form hideEdit="False" isVisible="true" onUnloadCancelJobs="true" stylesheet="indexing_performance_instance_extension.css" script="common_control.js" theme="light">
+  <!--###########base searches###########-->
+  <!--base search _internal-->
+  <search id="internal_splunkd_log_base">
+    <query>
+index=_internal search_group="dmc_group_indexer" search_group="$dmc_group$"  sourcetype=splunkd (source=*splunkd.log OR source=*metrics.log) | fields _time, host,source,sourcetype,sourceHost, log_level,search_group,group,hostname,kb,ingest_pipe,series,blocked,name,new_channels,component,source_IP,reply,event_message,data.series
+</query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <!--base search _introspection-->
+  <search id="introspection_resource_usage_log_base">
+    <query>
+index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"  source=*resource_usage.log* OR sourcetype=http_event_collector_metrics | fields _time, host,data.cpu_idle_pct,data.normalized_load_avg_1min,data.avg_total_ms,data.mount_point,component,data.search_props.mode,data.search_props.type,data.search_props.label,data.search_props.app,data.search_props.sid data.elapsed,data.mem_used,data.mem,data.token_name,data.num_of_events
+        </query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <!--base searches end-->
+  <label>http event collector analysis</label>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="dmc_group">
+      <label>select Splunk HEC receiver group</label>
+      <showClearButton>false</showClearButton>
+      <search>
+        <query>| `dmc_get_groups_containing_role(dmc_group_indexer)` | search search_group!="dmc_group_*"</query>
+      </search>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+      <choice value="dmc_group_indexer">All</choice>
+    </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+  <h3>Overview</h3>
+  <p/>
+  Description: This dashboard offers a consolidated view of configurations and metrics which are of interest when troubleshooting HEC performance / ingestion issues. The goal is to provide insights into the Splunk HEC receiver group (HF or indexer) for identifying any bottlenecks in the platform.
+  <p/>
+  Where to install: Install this view on the monitoring console instance inside the monitoring console app and make sure the hec receiver group instances are added to the monitoring console as distributed search peers with the server role of indexer. Custom group labels can be applied in the monitoring console setup to group the hec receivers if necessary.
+ For assistance configuring the monitoring console: <a href="https://docs.splunk.com/Documentation/Splunk/latest/DMC/Configureindistributedmode" target="_blank">https://docs.splunk.com/Documentation/Splunk/latest/DMC/Configureindistributedmode</a>.
+  <p/>
+  <p/>
+
+</html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>server info</title>
+        <search>
+          <query>| rest /services/server/sysinfo splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ | join splunk_server [| rest /services/server/info splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">3</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>http input settings</title>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$  /services/properties/inputs/http/disabled | search value=0  | rename value as disabled
+ | join splunk_server [ | rest /services/properties/inputs/http/dedicatedIoThreads | rename value as dedicatedIoThreads] | join splunk_server [ | rest /services/properties/inputs/http/enableSSL | rename value as enableSSL] | join splunk_server [ | rest /services/properties/inputs/http/port | rename value as port] | join splunk_server [ | rest /services/properties/inputs/http/maxSockets | rename value as maxSockets] | join splunk_server [ | rest /services/properties/inputs/http/maxThreads | rename value as maxThreads] | eval stanza="http" | eval conf="inputs.conf"|  fields splunk_server conf stanza maxSockets  maxThreads dedicatedIoThreads busyKeepAliveIdleTimeout enableSSL port disabled</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>HEC input tokens</title>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ /services/data/inputs/http | search disabled=0 | search title!=*streamfwd | eval conf="inputs.conf" | fields splunk_server conf title index indexes sourcetype token useACK | eval useACK=if(isnull(useACK),0,useACK) | rename title as stanza</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>parallelIngestionPipelines</title>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$  /services/properties/server/general/parallelIngestionPipelines | rename value as "parallelIngestionPipelines" | eval conf="server.conf" | eval stanza="general" | table splunk_server conf stanza "parallelIngestionPipelines"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">HttpInputDataHandler errors</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Identifies if there are any HttpInputDataHandler errors logged by the HEC reciever.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> Review the reply code sent back to the client to determine the nature of the error. To ensure data is successfully ingested into the Splunk platform, configure your clients with the ability to act on response codes returned by the HEC endpoint. If the client can't take an action based on the resulting response code, data loss might occur.</p>
+          <p>If no response to the client is logged enable DEBUG:</p>
+          <p>./splunk set log-level HttpInputDataHandler -level DEBUG</p>
+          <p>to revert logging level:</p>
+          <p>./splunk set log-level HttpInputDataHandler -level WARN</p>
+          </html>
+      <chart>
+        <search base="internal_splunkd_log_base">
+          <query> | search component=HttpInputDataHandler log_level!=INFO | timechart minspan=10s count by host</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="t1">$click.name2$</set>
+        </drilldown>
+      </chart>
+      <html>
+        <p>Click on host for detail.</p>
+
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$t1$">
+      <html>
+    <a data-unset-token="t1">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$t1$">
+      <chart>
+        <search base="internal_splunkd_log_base">
+          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$ | timechart  minspan=10s count by event_message limit=0 useother=f</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$t1$">
+      <table>
+        <search base="internal_splunkd_log_base">
+          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$ reply=* | eval response_to_client=case(reply=="0","success",reply=="1","Token disabled",reply=="2","Token is required",reply=="3","Invalid authorization",reply=="4","Invalid token",reply=="5","No data",reply=="6","Invalid data format",reply=="7","Incorrect index",reply=="9","Server is busy",reply=="10","Data channel is missing",reply=="11","Invalid data channel",reply=="12","Event field is required",reply=="13","Event field cannot be blank",reply=="14","ACK is disabled",reply=="15","Error in handling indexed fields",reply=="16","Query string authorization is not enabled",reply=="17","HEC is healthy",reply=="18","HEC is unhealthy, queues are full",reply=="19","HEC is unhealthy, ack service unavailable",reply=="20","Hec is unhealthy, queues are full, ack service unavailable") | stats count by host source_IP reply response_to_client | rename host as "HEC Receiver" source_IP as "HEC client"</query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$t1$">
+      <table>
+        <search base="internal_splunkd_log_base">
+          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$ | stats list(_raw) by _time host</query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Physical Memory Usage Deployment-Wide</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Shows maximum physical memory usage percentage across all members of the selected group.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>Review Monitoring Console Resource Usage Instance views to determine the processes consuming the most memory.</p>
+          </html>
+      <html>
+        <p>Click chart for per host detail.</p>
+
+      </html>
+      <chart>
+        <search base="introspection_resource_usage_log_base">
+          <!--post process results from base search-->
+          <query>|search component=Hostwide
+| eval pct_mem_usage=(('data.mem_used' / 'data.mem') * 100), server=host
+| bin _time span=10s
+| stats latest(pct_mem_usage) as dedup_pct_mem_usage by server _time
+| timechart minspan=10s Max(dedup_pct_mem_usage) as pct_mem_usage | eval ceiling=100</query>
+        </search>
+        <!--call the base search-->
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">% memory usage</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">ceiling</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="t2">$click.value2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel depends="$t2$">
+      <html>
+    <a data-unset-token="t2">Close this panel</a>
+  </html>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Physical Memory Usage by Host</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Shows maximum physical memory usage percentage by Host.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>Review Monitoring Console Resource Usage Instance views to determine the processes consuming the most memory.</p>
+          </html>
+      <chart>
+        <search base="introspection_resource_usage_log_base">
+          <!--post process results from base search-->
+          <query>| search component=Hostwide
+| eval pct_mem_usage=(('data.mem_used' / 'data.mem') * 100), server=host
+| bin _time span=10s
+| stats latest(pct_mem_usage) as dedup_pct_mem_usage by server _time
+| timechart minspan=10s Max(dedup_pct_mem_usage) as pct_mem_usage by server  | eval ceiling=100</query>
+        </search>
+        <!--call the base search-->
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">% memory usage</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">ceiling</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Load Average Deployment-Wide</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Shows maximum normalized 1m load avg based on physical cpu core count across all members of the selected group.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>Sustained values above 1 are concerning (1=100% cpu system utilization), review Monitoring Console Resource Usage Instance views to determine the processes consuming the most cpu.</p>
+          </html>
+      <html>
+        <p>Click chart for per host detail.</p>
+
+      </html>
+      <chart>
+        <search base="introspection_resource_usage_log_base">
+          <!--post process results from base search-->
+          <query>|search component=Hostwide
+
+| eval server=host
+| bin _time span=10s
+| stats latest(data.normalized_load_avg_1min) as dedup_load_average by server _time
+| timechart minspan=10s Max(dedup_load_average) as load_average | eval ceiling=1</query>
+        </search>
+        <!--call the base search-->
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">ceiling</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="t3">$click.value2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel depends="$t3$">
+      <html>
+    <a data-unset-token="t3">Close this panel</a>
+  </html>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Load Average by Host</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Shows maximum normalized 1m load avg based on physical cpu core count by host
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>Sustained values above 1 are concerning (1=100% cpu system utilization), review Monitoring Console Resource Usage Instance views to determine the processes consuming the most cpu.</p>
+          </html>
+      <chart>
+        <search base="introspection_resource_usage_log_base">
+          <!--post process results from base search-->
+          <query>| timechart span=10s  max(data.normalized_load_avg_1min) by host  | eval ceiling=1</query>
+        </search>
+        <!--call the base search-->
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Disk latency</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> The average time (in milliseconds) for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> Use to review Disk latency. Ideal await times for any mount point where Splunk operates is under 10ms</p>
+          </html>
+      <chart>
+        <search base="introspection_resource_usage_log_base">
+          <!--post process results from base search-->
+          <query>|search component=IOstats data.avg_total_ms&gt;0 "data.mount_point"=*| timechart minspan=10s limit=60 max(data.avg_total_ms) by host | eval ideal_latency=10</query>
+        </search>
+        <!--call the base search-->
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">await (ms)</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.overlayFields">ideal_latency</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="t4">$click.name2$</set>
+        </drilldown>
+      </chart>
+      <html>
+        <p>Click host to split by mount point.</p>
+
+      </html>
+    </panel>
+    <panel depends="$t4$">
+      <html>
+    <a data-unset-token="t4">Close this panel</a>
+  </html>
+      <chart>
+        <title>$t4$</title>
+        <search base="introspection_resource_usage_log_base">
+          <query>|search host="$t4$" component=IOstats data.avg_total_ms&gt;0 "data.mount_point"=*| timechart minspan=10s limit=60 max(data.avg_total_ms) by data.mount_point | eval ideal_latency=10</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">await (ms)</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+       <h1>
+         <b>
+           <span style="color: #ED179F">Channels</span>  </b>
+
+       </h1>
+
+       <b>Description:</b> A channel is a virtual connection Splunk maintains which is a tuple of source+sourcetype+host+tcp connection. More than 5k per ingest pipe or 10k total across all ingest pipes can reduce ingestion thruput.
+</html>
+      <html>
+       <p>
+<b>Recommended Action:</b> <p>
+         <b>a.)</b> Consider increasing parallel ingestion pipelines if more than 5k channels per ingest pipe but less than 10k per instance</p>
+<p>server.conf:</p>
+<p>[general]</p>
+<p>parallelIngestionPipelines = 2</p>
+<p>
+         <b>b.)</b> Increase inactive channels. By increasing inactive channels we are building a larger inactive list that provides more thruput as channels live longer.</p>
+
+<p>limits.conf:</p>
+<p>[input_channels]</p>
+<p>max_inactive = 400000</p>
+<p>lowater_inactive = 400000</p>
+
+<b>c.)</b> Consider increasing autoLBFrequency of upstream forwarders up to 180s</p>
+<p>outputs.conf:</p>
+<p>[tcpout]</p>
+<p>autoLBFrequency = 180</p>
+
+ 
+   </html>
+      <chart>
+        <search base="internal_splunkd_log_base">
+          <query>|timechart   max(new_channels) by host useother=f limit=0 | eval channel_threshold_ceiling=10000</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">channel_threshold_ceiling</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Blocked Queues</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Identifies if there are any blocked queues by host and queue name. Blocked queues can lead to backpressure to the hec clients and result in data loss.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> Use the monitoring console Indexing&gt;Performance&gt;Instance to troubleshoot Splunk data processing queues.</p>
+          </html>
+      <chart>
+        <search base="internal_splunkd_log_base">
+          <query>| search group=queue 
+                       blocked=true | eval host_name=host.":".name | timechart minspan=10s count by host_name useother=f limit=0</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Throughput KB/s per Instance</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Measures total throughput in KB/s per HEC receiver instance.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> If throughput is greater than 20MB/s per HEC receiving instance (Heavy Forwarder), consider scaling horizontally by adding more heavy forwarders. </p>
+          </html>
+      <chart>
+        <search base="internal_splunkd_log_base">
+          <query>| search name=index_thruput | timechart minspan=30s partial=f per_second(kb) AS kbps by host 
+| eval kbps=round(kbps,0)</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">KB/s</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">minmax</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <input type="multiselect" token="index" searchWhenChanged="true">
+        <label>index</label>
+        <valuePrefix>index=</valuePrefix>
+        <delimiter> OR </delimiter>
+        <fieldForLabel>index</fieldForLabel>
+        <fieldForValue>index</fieldForValue>
+        <search>
+          <query>| tstats count WHERE (index!=_*) BY index | fields index</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
+      <input type="dropdown" token="span" searchWhenChanged="true">
+        <label>span</label>
+        <choice value="span=1m">1m</choice>
+        <choice value="span=5m">5m</choice>
+        <choice value="span=15m">15m</choice>
+        <choice value="span=1h">1h</choice>
+        <choice value="span=4h">4h</choice>
+        <choice value="span=1d">1d</choice>
+        <default>span=1m</default>
+        <initialValue>span=1m</initialValue>
+      </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Event count by index</span>  </b>
+
+        </h1>
+
+          </html>
+      <chart>
+        <search>
+          <query>| tstats count WHERE ($index$) BY index _time $span$ prestats=t
+| timechart $span$ count by index</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <input type="dropdown" token="token" searchWhenChanged="true">
+        <label>select token</label>
+        <fieldForLabel>data.token_name</fieldForLabel>
+        <fieldForValue>data.token_name</fieldForValue>
+        <search>
+          <query>index=_introspection component="HttpEventCollector" "data.series"="http_event_collector_token"    sourcetype=http_event_collector_metrics  source=*/http_event_collector_metrics.log | dedup data.token_name | table data.token_name</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+        <prefix>data.token_name=</prefix>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+      </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Events per second by hec token</span>  </b>
+
+        </h1>
+
+          </html>
+      <chart>
+        <search base="introspection_resource_usage_log_base">
+          <query>| search $token$ | timechart  span=1m partial=f per_second(data.num_of_events) as eps by data.token_name usenull=f</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">events per second</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">zero</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+       <h1>
+         <b>
+           <span style="color: #ED179F">Tuning Tips</span>  </b>
+
+       </h1>
+
+       <b>sample config tuning on Splunk HEC receiver:</b> 
+
+<p>
+<p>
+            <b>inputs.conf:</b>
+          </p>
+<p>
+            <b>[http]</b>
+          </p>
+<p>dedicatedIoThreads = 8</p>
+<p>#4-8 but not more than # of cpu cores. Default 0  (uses single thread)</p>
+<p>busyKeepAliveIdleTimeout = 600</p>
+<p>#increase if load balancer in front of hec receivers. Set busyKeepAliveIdleTimeout value higher than load balancer's idle timeout value</p>
+<p>maxSockets = 300000</p>
+<p>maxThreads = 100000</p>
+<p> </p>
+<p>
+            <b>[http://name]</b>
+          </p>
+<p>queueSize = 10MB</p>
+
+<p>
+            <b>limits.conf:</b>
+          </p>
+<p>
+            <b>[input_channels]</b>
+          </p>
+<p>max_inactive = 400000</p>
+<p>lowater_inactive = 400000</p>
+
+<p>
+            <b>server.conf:</b>
+          </p>
+<p>
+            <b>[general]</b>
+          </p>
+<p>parallelIngestionPipelines = 2</p>
+</p>
+<br/>
+<p>
+          <b>curl example:</b>
+        </p>
+<p>
+          <b>if HEC receiver is not using indexer acknowledgement (useACK = 0):</b>
+        </p>
+<p>curl -k -H "Authorization: Splunk b5823516-1d22-4a7f-b6b3-74adb44da5ee" https://your-hec-receiver:8088/services/collector/event -d '{"sourcetype": "mysourcetype", "event": "sample hec event no ACK!"}'</p>
+
+<p>
+          <b>if HEC receiver is using indexer acknowledgement (useACK = 1) you must supply a channel identifier:</b>
+        </p>
+
+<p>curl -k -H "Authorization: Splunk b5823516-1d22-4a7f-b6b3-74adb44da5ee" -H "X-Splunk-Request-Channel: FE0ECFAD-13D5-401B-847D-77833BD77131" https://your-hec-receiver:8088/services/collector/event -d '{"sourcetype": "mysourcetype", "event": "sample hec event with ACKS"}'</p>
+
+
+
+   </html>
+    </panel>
+  </row>
+</form>
