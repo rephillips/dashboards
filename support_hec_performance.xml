@@ -57,7 +57,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
       <table>
         <title>server info</title>
         <search>
-          <query>| rest /services/server/sysinfo splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ | join splunk_server [| rest /services/server/info splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state</query>
+          <query>| rest /services/server/sysinfo splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ | join splunk_server [| rest /services/server/info splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state | sort +splunk_server</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -66,6 +66,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -78,7 +79,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <title>http input settings</title>
         <search>
           <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$  /services/properties/inputs/http/disabled | search value=0  | rename value as disabled
- | join splunk_server [ | rest /services/properties/inputs/http/dedicatedIoThreads | rename value as dedicatedIoThreads] | join splunk_server [ | rest /services/properties/inputs/http/enableSSL | rename value as enableSSL] | join splunk_server [ | rest /services/properties/inputs/http/port | rename value as port] | join splunk_server [ | rest /services/properties/inputs/http/maxSockets | rename value as maxSockets] | join splunk_server [ | rest /services/properties/inputs/http/maxThreads | rename value as maxThreads] | eval stanza="http" | eval conf="inputs.conf"|  fields splunk_server conf stanza maxSockets  maxThreads dedicatedIoThreads  enableSSL port disabled</query>
+ | join splunk_server [ | rest /services/properties/inputs/http/dedicatedIoThreads | rename value as dedicatedIoThreads] | join splunk_server [ | rest /services/properties/inputs/http/enableSSL | rename value as enableSSL] | join splunk_server [ | rest /services/properties/inputs/http/port | rename value as port] | join splunk_server [ | rest /services/properties/inputs/http/maxSockets | rename value as maxSockets] | join splunk_server [ | rest /services/properties/inputs/http/maxThreads | rename value as maxThreads] | eval stanza="http" | eval conf="inputs.conf"|  fields splunk_server conf stanza maxSockets  maxThreads dedicatedIoThreads  enableSSL port disabled | sort +splunk_server</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -87,6 +88,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -98,7 +100,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
       <table>
         <title>HEC input tokens</title>
         <search>
-          <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ /services/data/inputs/http | search title!=*streamfwd | eval conf="inputs.conf" | fields splunk_server conf title index indexes sourcetype token useACK disabled | eval useACK=if(isnull(useACK),0,useACK) | rename title as stanza</query>
+          <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ /services/data/inputs/http | search title!=*streamfwd | eval conf="inputs.conf" | fields splunk_server conf title index indexes sourcetype token useACK disabled | eval useACK=if(isnull(useACK),0,useACK) | rename title as stanza | sort +splunk_server</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -119,7 +121,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
       <table>
         <title>parallelIngestionPipelines</title>
         <search>
-          <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$  /services/properties/server/general/parallelIngestionPipelines | rename value as "parallelIngestionPipelines" | eval conf="server.conf" | eval stanza="general" | table splunk_server conf stanza "parallelIngestionPipelines"</query>
+          <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$  /services/properties/server/general/parallelIngestionPipelines | rename value as "parallelIngestionPipelines" | eval conf="server.conf" | eval stanza="general" | table splunk_server conf stanza "parallelIngestionPipelines" | sort +splunk_server</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -128,6 +130,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -153,46 +156,32 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
           <p>to revert logging level:</p>
           <p>./splunk set log-level HttpInputDataHandler -level WARN</p>
           </html>
-      <chart>
-        <search base="internal_splunkd_log_base">
-          <query> | search component=HttpInputDataHandler log_level!=INFO | timechart minspan=10s count by host</query>
+      <table>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group="$dmc_group$"  sourcetype=splunkd source=*splunkd.log component=HttpInputDataHandler log_level!=INFO TERM(reply) | rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
+| eval reply=coalesce(reply,handled_reply) 
+| eval channel = if(isnotnull(channel), channel, handled_channel)
+| eval handled_channel = if(isnotnull(handled_channel), handled_channel, "n/a") 
+| eval channel=coalesce(channel,handled_channel) 
+| eval token=coalesce(name,handled_token) 
+| eval source_IP = if(isnotnull(source_IP), source_IP, "n/a") 
+| eval response_to_client=case(reply=="0","success",reply=="1","Token disabled",reply=="2","Token is required",reply=="3","Invalid authorization",reply=="4","Invalid token",reply=="5","No data",reply=="6","Invalid data format",reply=="7","Incorrect index",reply=="9","Server is busy",reply=="10","Data channel is missing",reply=="11","Invalid data channel",reply=="12","Event field is required",reply=="13","Event field cannot be blank",reply=="14","ACK is disabled",reply=="15","Error in handling indexed fields",reply=="16","Query string authorization is not enabled",reply=="17","HEC is healthy",reply=="18","HEC is unhealthy, queues are full",reply=="19","HEC is unhealthy, ack service unavailable",reply=="20","Hec is unhealthy, queues are full, ack service unavailable") 
+| table _time host log_level token channel reply source_IP response_to_client | stats count by host token reply source_IP response_to_client | stats list(source_IP) as source_IP list(reply) as reply list(response_to_client) as response_to_client  list(count) as count by host token | sort +host</query>
+          <earliest>$earliest$</earliest>
+          <latest>$latest$</latest>
         </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">column</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">stacked</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">all</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
         <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
         <drilldown>
-          <set token="t1">$click.name2$</set>
+          <set token="t1">$click.value$</set>
         </drilldown>
-      </chart>
+      </table>
       <html>
         <p>Click on host for detail.</p>
 
@@ -209,8 +198,9 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
   <row>
     <panel depends="$t1$">
       <chart>
+        <title>host: $t1$</title>
         <search base="internal_splunkd_log_base">
-          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$ | timechart  minspan=10s count by event_message limit=0 useother=f</query>
+          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$ reply | timechart  minspan=10s count by event_message limit=0 useother=f</query>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -250,6 +240,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
   <row>
     <panel depends="$t1$">
       <table>
+        <title>host: $t1$</title>
         <search base="internal_splunkd_log_base">
           <query>|search host=$t1$ component=HttpInputDataHandler log_level!=INFO TERM(reply) | rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
 | eval reply=coalesce(reply,handled_reply) 
@@ -260,23 +251,6 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 | eval source_IP = if(isnotnull(source_IP), source_IP, "n/a") 
 | eval response_to_client=case(reply=="0","success",reply=="1","Token disabled",reply=="2","Token is required",reply=="3","Invalid authorization",reply=="4","Invalid token",reply=="5","No data",reply=="6","Invalid data format",reply=="7","Incorrect index",reply=="9","Server is busy",reply=="10","Data channel is missing",reply=="11","Invalid data channel",reply=="12","Event field is required",reply=="13","Event field cannot be blank",reply=="14","ACK is disabled",reply=="15","Error in handling indexed fields",reply=="16","Query string authorization is not enabled",reply=="17","HEC is healthy",reply=="18","HEC is unhealthy, queues are full",reply=="19","HEC is unhealthy, ack service unavailable",reply=="20","Hec is unhealthy, queues are full, ack service unavailable") 
 | table _time host log_level token channel reply source_IP response_to_client</query>
-        </search>
-        <option name="count">5</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
-    </panel>
-  </row>
-  <row>
-    <panel depends="$t1$">
-      <table>
-        <search base="internal_splunkd_log_base">
-          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$ | stats list(_raw) by _time host</query>
         </search>
         <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
