@@ -1,4 +1,5 @@
 <form hideEdit="False" isVisible="true" onUnloadCancelJobs="true" stylesheet="indexing_performance_instance_extension.css" script="common_control.js" theme="light">
+  <!-- Author: Rob Phillips, rphillips@splunk.com -->
   <!--###########base searches###########-->
   <!--base search _internal-->
   <search id="internal_splunkd_log_base">
@@ -17,7 +18,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
     <latest>$time.latest$</latest>
   </search>
   <!--base searches end-->
-  <label>http event collector analysis</label>
+  <label>support_hec_analysis</label>
   <fieldset autoRun="true" submitButton="false">
     <input type="dropdown" searchWhenChanged="true" token="dmc_group">
       <label>select Splunk HEC receiver group</label>
@@ -40,7 +41,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
   <row>
     <panel>
       <html>
-  <h3>Overview</h3>
+ 
   <p/>
   Description: This dashboard offers a consolidated view of configurations and metrics which are of interest when troubleshooting HEC performance / ingestion issues. The goal is to provide insights into the Splunk HEC receiver group (HF or indexer) for identifying any bottlenecks in the platform.
   <p/>
@@ -66,8 +67,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
@@ -88,8 +88,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
@@ -109,8 +108,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
@@ -130,8 +128,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
@@ -139,6 +136,23 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
   </row>
   <row>
     <panel>
+      <input type="multiselect" token="tk" searchWhenChanged="true">
+        <label>select hec token</label>
+        <choice value="*">All</choice>
+        <prefix>token=</prefix>
+        <delimiter> OR token=</delimiter>
+        <fieldForLabel>token</fieldForLabel>
+        <fieldForValue>token</fieldForValue>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group="$dmc_group$" sourcetype=splunkd source=*splunkd.log component=HttpInputDataHandler log_level!=INFO TERM(reply) NOT "reply: 0" | rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
+
+| eval token=coalesce(name,handled_token) 
+
+| dedup token | table token</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
       <html>
         <h1>
           <b>
@@ -157,8 +171,8 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
           <p>./splunk set log-level HttpInputDataHandler -level WARN</p>
           </html>
       <table>
-        <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group="$dmc_group$"  sourcetype=splunkd source=*splunkd.log component=HttpInputDataHandler log_level!=INFO TERM(reply) | rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
+        <search base="internal_splunkd_log_base">
+          <query>|search component=HttpInputDataHandler log_level!=INFO TERM(reply) NOT "reply: 0" | rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
 | eval reply=coalesce(reply,handled_reply) 
 | eval channel = if(isnotnull(channel), channel, handled_channel)
 | eval handled_channel = if(isnotnull(handled_channel), handled_channel, "n/a") 
@@ -166,9 +180,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 | eval token=coalesce(name,handled_token) 
 | eval source_IP = if(isnotnull(source_IP), source_IP, "n/a") 
 | eval response_to_client=case(reply=="0","success",reply=="1","Token disabled",reply=="2","Token is required",reply=="3","Invalid authorization",reply=="4","Invalid token",reply=="5","No data",reply=="6","Invalid data format",reply=="7","Incorrect index",reply=="9","Server is busy",reply=="10","Data channel is missing",reply=="11","Invalid data channel",reply=="12","Event field is required",reply=="13","Event field cannot be blank",reply=="14","ACK is disabled",reply=="15","Error in handling indexed fields",reply=="16","Query string authorization is not enabled",reply=="17","HEC is healthy",reply=="18","HEC is unhealthy, queues are full",reply=="19","HEC is unhealthy, ack service unavailable",reply=="20","Hec is unhealthy, queues are full, ack service unavailable") 
-| table _time host log_level token channel reply source_IP response_to_client | stats count by host token reply source_IP response_to_client | stats list(source_IP) as source_IP list(reply) as reply list(response_to_client) as response_to_client  list(count) as count by host token | sort +host</query>
-          <earliest>$earliest$</earliest>
-          <latest>$latest$</latest>
+| table _time host log_level token channel reply source_IP response_to_client | stats count by host token reply source_IP response_to_client | stats list(source_IP) as source_IP list(reply) as reply list(response_to_client) as response_to_client  list(count) as count by host token | sort +host | search $tk$</query>
         </search>
         <option name="count">100</option>
         <option name="dataOverlayMode">none</option>
@@ -200,7 +212,13 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
       <chart>
         <title>host: $t1$</title>
         <search base="internal_splunkd_log_base">
-          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$ reply | timechart  minspan=10s count by event_message limit=0 useother=f</query>
+          <query>|search component=HttpInputDataHandler log_level!=INFO host=$t1$   reply NOT "reply: 0"| rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
+| eval reply=coalesce(reply,handled_reply) 
+| eval channel = if(isnotnull(channel), channel, handled_channel)
+| eval handled_channel = if(isnotnull(handled_channel), handled_channel, "n/a") 
+| eval channel=coalesce(channel,handled_channel) 
+| eval token=coalesce(name,handled_token)  
+|search $tk$| timechart  minspan=10s count by event_message limit=0 useother=f</query>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -242,7 +260,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
       <table>
         <title>host: $t1$</title>
         <search base="internal_splunkd_log_base">
-          <query>|search host=$t1$ component=HttpInputDataHandler log_level!=INFO TERM(reply) | rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
+          <query>|search host=$t1$ component=HttpInputDataHandler log_level!=INFO TERM(reply)  NOT "reply: 0" | rex "handled token: (?&lt;handled_token&gt;\S+),\s+channel:\s+(?&lt;handled_channel&gt;\S+),\s+reply:\s+(?&lt;handled_reply&gt;\S+)," 
 | eval reply=coalesce(reply,handled_reply) 
 | eval channel = if(isnotnull(channel), channel, handled_channel)
 | eval handled_channel = if(isnotnull(handled_channel), handled_channel, "n/a") 
@@ -250,12 +268,13 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 | eval token=coalesce(name,handled_token) 
 | eval source_IP = if(isnotnull(source_IP), source_IP, "n/a") 
 | eval response_to_client=case(reply=="0","success",reply=="1","Token disabled",reply=="2","Token is required",reply=="3","Invalid authorization",reply=="4","Invalid token",reply=="5","No data",reply=="6","Invalid data format",reply=="7","Incorrect index",reply=="9","Server is busy",reply=="10","Data channel is missing",reply=="11","Invalid data channel",reply=="12","Event field is required",reply=="13","Event field cannot be blank",reply=="14","ACK is disabled",reply=="15","Error in handling indexed fields",reply=="16","Query string authorization is not enabled",reply=="17","HEC is healthy",reply=="18","HEC is unhealthy, queues are full",reply=="19","HEC is unhealthy, ack service unavailable",reply=="20","Hec is unhealthy, queues are full, ack service unavailable") 
-| table _time host log_level token channel reply source_IP response_to_client</query>
+| table _time host log_level token channel reply source_IP response_to_client | search $tk$</query>
         </search>
         <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -962,7 +981,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 
 <p>
 <p>
-            <b>inputs.conf:</b>
+            <b style="color: #ED179F"> inputs.conf:</b>
           </p>
 <p>
             <b>[http]</b>
@@ -980,7 +999,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 <p>queueSize = 10MB</p>
 
 <p>
-            <b>limits.conf:</b>
+            <b style="color: #ED179F">limits.conf:</b>
           </p>
 <p>
             <b>[input_channels]</b>
@@ -989,7 +1008,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 <p>lowater_inactive = 400000</p>
 
 <p>
-            <b>server.conf:</b>
+          <b style="color: #ED179F">server.conf:</b>
           </p>
 <p>
             <b>[general]</b>
@@ -998,7 +1017,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 </p>
 <br/>
 <p>
-          <b>curl example:</b>
+         <b style="color: #ED179F">curl example:</b>
         </p>
 <p>
           <b>if HEC receiver is not using indexer acknowledgement (useACK = 0):</b>
