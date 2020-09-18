@@ -656,7 +656,11 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 
        </h1>
 
-       <b>Description:</b> A channel is a virtual connection Splunk maintains which is a tuple of source+sourcetype+host+tcp connection. More than 5k per ingest pipe or 10k total across all ingest pipes can reduce ingestion thruput.
+       <b>Description:</b> A channel is a virtual connection Splunk maintains which is a tuple of source+sourcetype+host. More than 
+       <b>
+           <span style="color: #ED179F">5k</span>  </b> 
+           per ingest pipe or <b>
+           <span style="color: #ED179F">10k</span>  </b>  total across all ingest pipes per Splunk instance can reduce ingestion thruput.
 </html>
       <html>
        <p>
@@ -666,27 +670,27 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
 <p>[general]</p>
 <p>parallelIngestionPipelines = 2</p>
 <p>
-         <b>b.)</b> Increase inactive channels. By increasing inactive channels we are building a larger inactive list that provides more thruput as channels live longer.</p>
+         <b>b.)</b> Increase inactive channels if more than 10k new_channels per instance in a 30s span. By increasing inactive channels we are building a larger cache of inactive channels which can be reused. This can increase thruput as channels live longer. This action is only effective when those input channels could have been reused: for example, the source, sourcetype, and host fields are not generated randomly and tend to be reused within the lifetime of cached channel entries</p>
 
 <p>limits.conf:</p>
 <p>[input_channels]</p>
 <p>max_inactive = 400000</p>
 <p>lowater_inactive = 400000</p>
+</p>
 
-<b>c.)</b> Consider increasing autoLBFrequency of upstream forwarders up to 180s</p>
-<p>outputs.conf:</p>
-<p>[tcpout]</p>
-<p>autoLBFrequency = 180</p>
+
 
  
    </html>
       <chart>
+        <title>new channels per Splunk instance</title>
         <search base="internal_splunkd_log_base">
-          <query>|timechart   max(new_channels) by host useother=f limit=0 | eval channel_threshold_ceiling=10000</query>
+          <query>|search new_channels |timechart   span=30s sum(new_channels) by host useother=f limit=0 | eval instance_channel_threshold=10000</query>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
         <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">new_channels</option>
         <option name="charting.axisTitleY.visibility">visible</option>
         <option name="charting.axisTitleY2.visibility">visible</option>
         <option name="charting.axisX.abbreviation">none</option>
@@ -701,7 +705,62 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
         <option name="charting.chart.bubbleMinimumSize">10</option>
         <option name="charting.chart.bubbleSizeBy">area</option>
         <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.overlayFields">channel_threshold_ceiling</option>
+        <option name="charting.chart.overlayFields">instance_channel_threshold</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="t5">$click.name2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel depends="$t5$">
+      <html>
+    <a data-unset-token="t5">Close this panel</a>
+  </html>
+      <html>
+       <h1>
+         <b>
+           <span style="color: #ED179F">Channels per ingest_pipe</span>  </b>
+
+       </h1>
+       </html>
+      <chart>
+        <title>new channels per pipeline on instance: $t5$</title>
+        <search base="internal_splunkd_log_base">
+          <query>|search  host="$t5$" new_channels | eval ingest_pipeline= if(isnull(ingest_pipe),0,ingest_pipe)
+| timechart span=30s max(new_channels) by ingest_pipeline limit=0 useother=f | eval pipeline_channel_threshold=5000</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">new_channels</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
         <option name="charting.chart.stackMode">default</option>
@@ -791,7 +850,7 @@ index=_introspection search_group="dmc_group_indexer" search_group="$dmc_group$"
           </html>
       <chart>
         <search base="internal_splunkd_log_base">
-          <query>| search name=index_thruput | timechart minspan=30s partial=f per_second(kb) AS kbps by host 
+          <query>| search group=thruput name=thruput | timechart minspan=30s partial=f per_second(kb) AS kbps by host 
 | eval kbps=round(kbps,0)</query>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
