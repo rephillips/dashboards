@@ -1,0 +1,22 @@
+HttpInputReply,"event_message",reply,status
+Success,Success,0,OK
+TokenDisabled,"Token disabled",1,FORBIDDEN
+NoAuthorization,"Token is required",2,UNAUTHORIZED
+InvalidAuthorization,"Invalid authorization",3,UNAUTHORIZED
+TokenNotFound,"Invalid token",4,FORBIDDEN
+NoData,"No data",5,"BAD_REQUEST"
+InvalidData,"Invalid data format",6,"BAD_REQUEST"
+IncorrectIndex,"Incorrect index",7,"BAD_REQUEST"
+"ServerError has been removed as it is not used anywhere",,8,
+ServerBusy,"Server is busy",9,"SERVICE_UNAVAILABLE"
+NoChannel,"Data channel is missing",10,"BAD_REQUEST"
+InvalidChannel,"Invalid data channel",11,"BAD_REQUEST"
+NoEvent,"Event field is required",12,"BAD_REQUEST"
+BlankEvent,"Event field cannot be blank",13,"BAD_REQUEST"
+AckDisabled,"ACK is disabled",14,"BAD_REQUEST"
+UnsupportedType,"Error in handling indexed fields",15,"BAD_REQUEST"
+QueryStringAuthNotEnabled,"Query string authorization is not enabled",16,"BAD_REQUEST"
+HECHealthy,"HEC is healthy",17,OK
+QueuesFull,"HEC is unhealthy, queues are full",18,"SERVICE_UNAVAILABLE"
+AckUnavailable,"HEC is unhealthy, ack service unavailable",19,"SERVICE_UNAVAILABLE"
+QueuesFullAckUnavailable,"Hec is unhealthy, queues are full, ack service unavailable",20,"SERVICE_UNAVAILABLE"
