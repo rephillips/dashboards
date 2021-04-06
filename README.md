@@ -4,7 +4,7 @@ Install these views onto the Monitoring Console inside the monitoring console ap
 
 view: support_hec.xml
 
-requires: lookup file HEC_reply_codes, (download HEC_reply_codes.csv from github to your local machine)
+requires: lookup file HEC_reply_codes, (create HEC_reply_codes.csv from github raw view, save as HEC_reply_codes.csv to your desktop)
 
 1.) add lookup file to MC instance:
 on Monitoring Console > Settings > Lookups > Lookup table files > + Add new
