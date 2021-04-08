@@ -107,7 +107,9 @@
       <html>
  
   <p/>
-  <h1><span style="color: #ED179F">Description:</span></h1> 
+  <h1>
+          <span style="color: #ED179F">Description:</span>
+        </h1> 
   This dashboard offers a consolidated view of configurations and metrics which are of interest when troubleshooting HEC performance / ingestion issues. The goal is to provide insights into the Splunk HEC receiver group (HF or indexer) for identifying any bottlenecks in the platform.
   <p/>
   Install this view on the monitoring console instance inside the monitoring console app and make sure the hec receiver group instances are added to the monitoring console as distributed search peers with the server role of indexer. Custom group labels can be applied in the monitoring console setup to group the hec receivers if necessary.
@@ -177,6 +179,8 @@
           <earliest>-24h@h</earliest>
           <latest>now</latest>
         </search>
+        <valuePrefix>"</valuePrefix>
+        <valueSuffix>"</valueSuffix>
       </input>
       <table>
         <title>HEC input tokens</title>
@@ -466,6 +470,8 @@
         <change>
           <unset token="form.event_message"></unset>
         </change>
+        <valuePrefix>"</valuePrefix>
+        <valueSuffix>"</valueSuffix>
       </input>
       <input type="multiselect" token="event_message" searchWhenChanged="true">
         <label>event_message</label>
