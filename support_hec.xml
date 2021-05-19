@@ -101,6 +101,19 @@
         </condition>
       </change>
     </input>
+    <input type="checkbox" token="hec_reply_codes" searchWhenChanged="true">
+      <label></label>
+      <choice value="yes">show hec reply codes</choice>
+      <delimiter> </delimiter>
+      <change>
+        <condition value="yes">
+          <eval token="checked_result_value">"A"</eval>
+        </condition>
+        <condition>
+          <eval token="checked_result_value">"B"</eval>
+        </condition>
+      </change>
+    </input>
   </fieldset>
   <row>
     <panel>
@@ -118,6 +131,38 @@
   <p/>
 
 </html>
+
+    </panel>
+  </row>
+  <row>
+    <panel depends="$hec_reply_codes$">
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">HEC Reply Codes</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Logged in splunkd.log under the HttpInputDataHandler component reply field represents the reply the HEC receiver sends back to the client sending the request. The following status codes have particular meaning for all HTTP Event Collector endpoints.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>To ensure data is successfully ingested into the Splunk platform, configure your clients with the ability to act on response codes returned by the HEC endpoint. If the client can't take an action based on the resulting response code, data loss might occur.</p>
+          </html>
+      <table>
+        <search>
+          <query>| inputlookup HEC_reply_codes</query>
+        
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
   <row>
@@ -572,6 +617,26 @@
         <option name="trellis.size">large</option>
         <option name="trellis.splitBy">_aggregation</option>
       </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>HttpDedicatedIoThread is busy and responded after x (ms)</title>
+      <table>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=dmc_indexerclustergroup_lab-cluster01 host IN (rplinux-IDX1,rplinux-IDX2,rplinux-IDX3)  source=*watchdog.log name="'HttpDedicatedIoThread*'" finally received after | rex "finally received after (?&lt;ms&gt;\d+)\s+ms" | eval host_name=host.":".name | timechart span=60s max(ms) by host_name</query>
+          <earliest>-4h@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
   <row>
