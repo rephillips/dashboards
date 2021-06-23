@@ -1,0 +1,359 @@
+<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
+  <label>spl_186629 identification</label>
+  <search id="captainSnapshotSearch">
+    <query>
+      | rest splunk_server_group="$group$" splunk_server_group=dmc_group_search_head /services/shcluster/captain/info
+      | dedup peer_scheme_host_port
+      | fields label
+    </query>
+    <finalized>
+      <set token="captain_name">$result.label$</set>
+    </finalized>
+  </search>
+  <fieldset submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="group">
+      <label>Search Head Cluster:</label>
+      <showClearButton>false</showClearButton>
+      <populatingSearch fieldForLabel="label" fieldForValue="search_group">| `dmc_get_search_head_cluster_groups`</populatingSearch>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+    </input>
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+ 
+  <p/>
+  <h1>
+          <span style="color: #ED179F">Summary SPL-186629:</span>
+        </h1> 
+  The scheduler stops running searches which is caused by conf layer lock contention by the summarization endpoint.
+  <p/>
+The report acceleration cache defaults to an expiration of 10 minutes, associated with a large number of scheduled searches can cause the system to wait for resources while recalculating the cache. A lock contention in the conf system scenario is introduced due to every summarization endpoint handler thread trying to build the same cache entries at the same time. A lock contention occurs whenever one process or thread attempts to acquire a lock held by another process or thread. Growth of file descriptors is one symptom. The scheduler can also be impacted and result in scheduled searches not running or being delayed. Auto summary searches (data model acceleration and report acceleration) trigger this condition when the summarization endpoint handler thread builds the cache entries at the same time. The cache entries created refer to a mapping of searches to normalized search strings and is meant for a search to be able to check if it can use a summary report to speed up getting results by searching the summary buckets instead of the raw logs on the indexers. These summary buckets are created as a result of accelerating a report or datamodel. A workaround was developed to address this lock contention by randomizing the expiration time of the cache entries and making the lock contention less likely. More on normalized searches here: <a href="https://docs.splunk.com/Documentation/Splunk/8.0.4/Search/Searchnormalization" target="_blank">https://docs.splunk.com/Documentation/Splunk/8.0.4/Search/Searchnormalization</a>.
+  <p/>
+  <p/>
+  
+  
+  <p>
+          <b>Symptoms:</b>
+        </p>
+<p>- scheduler lock/delay resulting in skipped/deferred scheduled searches</p>
+<p> - increased file descriptor usage</p>
+ 
+<p><b>Steps to Debug:</b></p>
+<p>- put SavedSplunker on SHC captain into DEBUG</p>
+<p>- capture 1000 pstacks on main splunkd pid during a time when scheduler is locked up</p>
+<p>- generate a diag on each SHC member after the pstack collection finishes</p>
+<p>- upload pstacks and diags to Splunk Support</p>
+  
+<p>
+          <b>Fixed Versions:</b>
+        </p>
+<p>on prem:8.1.0+</p>
+<p>cloud: 8.0.2004+</p>
+
+
+
+
+<p>
+          <b>Workaround:</b>
+        </p>
+<p>apply to Search Heads:</p>
+<p>limits.conf</p>
+<p>[auto_summarizer]</p>
+<p>cache_timeout = 7200000</p>
+<p>#The minimum amount of time, in seconds, to cache auto summary details and search hash codes.</p>
+<p>#The cached entry expires randomly between 'cache_timeout' and "cache_timeout" seconds.</p>
+<p>#Default: 600 (10 minutes)</p>
+ 
+<p>search_2_hash_cache_timeout=7200000</p>
+<p>#The amount of time, in seconds, to cache search hash codes</p>
+<p>#Default: The value of the "cache_timeout" setting</p>
+
+
+<p>
+          <b>Should I revert back to defaults after (SPL-186629) is fixed?:</b>
+        </p>
+<p>Yes</p>
+</html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_search_head splunk_server_group="$group$" /services/server/info
+              | fields splunk_server,version,physicalMemoryMB, numberOfCores, numberOfVirtualCores</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <link target="_blank">search?q=| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ | where is_scheduled=1 | search disabled=0  | stats count by  title next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| fields title next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| rename title as savedsearch_name | join savedsearch_name [search index=_internal search_group=dmc_group_search_head search_group=$group$ sourcetype=scheduler  status=*  dispatch_time=*]&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <single>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*scheduler.log *ACCELERATE* earliest=-15m | dedup savedsearch_name | table savedsearch_name | stats count</query>
+          <earliest>$earliest$</earliest>
+          <latest>$latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,10,30,50]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="underLabel">number of accelerated searches</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>scheduler status</title>
+      <chart>
+        <title>identify a period where scheduler is locked up or not scheduling any searches</title>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$"   source=*scheduler.log status=* | eval status_host=status."::".host | timechart span=5m count by status_host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Watchdog thread name='SchedulerThread' finally received after x ms</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$"   source=*watchdog.log name='SchedulerThread' finally after | rex "finally received after (?&lt;thread_ms&gt;\d+)\s+ms" | eval host_thread=host."::".name | timechart span=5m max(thread_ms) by host_thread</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>"*/admin/summarization:" Broken pipe</title>
+      <table>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$" source=*splunkd.log WARN HttpListener - Socket error from while accessing "*/admin/summarization:" Broken pipe | timechart span=5m count by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <!-- Set span for each sparkline datapoint to be 1 m -->
+        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+        <format field="trend" type="sparkline">
+          <option name="type">line</option>
+          <option name="lineColor">#ff9999</option>
+          <option name="height">30px</option>
+          <option name="fillColor">#ffe699</option>
+          <option name="colorMap">
+            <option name="2000:">#ff9999</option>
+          </option>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>time spent in admin/summarization endpoint</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group="$group$"  source=*splunkd_access.log */admin/summarization* | timechart span=5m p90(spent) by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="s4">$click.value$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>file descriptor used</title>
+      <chart>
+        <search>
+          <query>index=_introspection search_group=dmc_group_search_head search_group="$group$"   source=*resource_usage.log| timechart span=5m max("data.fd_used") by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>thread count by host, process type</title>
+      <chart>
+        <search>
+          <query>index=_introspection search_group=dmc_group_search_head search_group="$group$"   source=*resource_usage.log | eval host_process=host."::".'data.process_type'| timechart span=5m max("data.t_count") by host_process limit=0</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+</form>
