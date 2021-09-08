@@ -1,0 +1,403 @@
+<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
+  <label>support_summary_index</label>
+  <description>description: This dashboard view was built to help highlight searches which either read from or write to summary indexes. Install this view on the Monitoring Console in the splunk_monitoring_console app</description>
+  <search>
+    <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
+    <done>
+      <set token="captain_name">$result.captain_label$</set>
+    </done>
+  </search>
+  <search>
+    <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ timeout=0 
+| search is_scheduled=1 
+| search action.summary_index=1 
+| search disabled=0 
+| fillnull action.summary_index._name value=summary 
+ 
+| fields +  action.summary_index._name 
+| rename action.summary_index._name as "summary_index" 
+| eval summary_index="\"".summary_index."\"" 
+| stats values(summary_index) as summary_index 
+| eval summary_index="index IN (".mvjoin(summary_index, ", ").")"</query>
+    <done>
+      <set token="summary_index">$result.summary_index$</set>
+    </done>
+  </search>
+  <search>
+    <query>| rest splunk_server=$captain_name$ /services/configs/conf-macros timeout=0
+| fields title definition 
+| rex field=definition max_match=1000 "index\=\s*\"*\_*(?&lt;index&gt;\w+)\s*\"*" 
+| search index=* 
+| search $summary_index$
+| fields + title 
+| eval macro="\"*".title."*\"" 
+| stats values(macro) as macro| eval macro="search IN (".mvjoin(macro, ", ").")"</query>
+    <done>
+      <set token="macro">$result.macro$</set>
+    </done>
+  </search>
+  <!--base search SHC _audit-->
+  <search id="audit_SHC_log_base">
+    <query>
+index=_audit sourcetype=audittrail source=audittrail search_group=dmc_group_search_head search_group="$group$"   | fields _time, host,savedsearch_name,action,info,search_et,search_lt,search,search_id,user,total_run_time
+      </query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <!--base searches end-->
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="group">
+      <label>Search Head Cluster:</label>
+      <showClearButton>true</showClearButton>
+      <selectFirstChoice>false</selectFirstChoice>
+      <populatingSearch>| `dmc_get_search_head_cluster_groups`</populatingSearch>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+    </input>
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <table>
+        <title>SHC captain: $captain_name$</title>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_search_head splunk_server_group="$group$" /services/server/info
+              | fields splunk_server,version,physicalMemoryMB, numberOfCores, numberOfVirtualCores</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <link target="_blank">search?q=| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ | where is_scheduled=1 | search disabled=0  | stats count by  title next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| fields title next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| rename title as savedsearch_name | join savedsearch_name [search index=_internal search_group=dmc_group_search_head search_group=$group$ sourcetype=scheduler  status=*  dispatch_time=*]&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>active summary indexes (summary indexes which have scheduled searches writing to them)</title>
+      <table>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ timeout=0 | search is_scheduled=1 |search action.summary_index=1 | search disabled=0 |fillnull action.summary_index._name value=summary | stats count by  action.summary_index._name | fields action.summary_index._name | rename action.summary_index._name as "summary index name"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>summary index populating searches by summary index name (searches that write to a summary index)</title>
+      <table>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ timeout=0 | search is_scheduled=1 |search action.summary_index=1 | search disabled=0 |fillnull action.summary_index._name value=summary | stats values(title) as savedsearch_name by  action.summary_index._name eai:acl.app | rename action.summary_index._name as "summary index name"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>searches that read from or write to summary index: $si$</title>
+      <input type="multiselect" token="si" searchWhenChanged="true">
+        <label>select summary index</label>
+        <choice value="*">All</choice>
+        <prefix>"summary index" IN(</prefix>
+        <valuePrefix>"</valuePrefix>
+        <valueSuffix>"</valueSuffix>
+        <delimiter> ,</delimiter>
+        <fieldForLabel>summary_index</fieldForLabel>
+        <fieldForValue>summary_index</fieldForValue>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ timeout=0 | search is_scheduled=1 |search action.summary_index=1 | search disabled=0 |fillnull action.summary_index._name value=summary | stats count by  action.summary_index._name | fields action.summary_index._name | rename action.summary_index._name as "summary_index"</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+        <suffix>)</suffix>
+        <default>*</default>
+      </input>
+      <input type="multiselect" token="tag" searchWhenChanged="true">
+        <label>tag</label>
+        <choice value="*">All</choice>
+        <choice value="reads from summary index">reads from summary index</choice>
+        <choice value="writes to summary index">writes to summary index</choice>
+        <default>*</default>
+        <prefix>tag IN(</prefix>
+        <suffix>)</suffix>
+        <valuePrefix>"</valuePrefix>
+        <valueSuffix>"</valueSuffix>
+        <delimiter>,</delimiter>
+      </input>
+      <table>
+        <title>read (from summary index) is only going to be as up to date as the last successful write (to summary index)</title>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ timeout=0 | search is_scheduled=1 |search action.summary_index=1 | search disabled=0 |fillnull action.summary_index._name value=summary | fields  title, cron_schedule action.summary_index._name,dispatch.earliest_time dispatch.latest_time allow_skew schedule_priority realtime_schedule eai:acl.app,eai:acl.owner,search | rename action.summary_index._name as "summary index" | eval tag="writes to summary index" | rename title as savedsearch_name | table savedsearch_name cron_schedule dispatch.earliest_time dispatch.latest_time allow_skew schedule_priority realtime_schedule eai:acl.app,eai:acl.owner tag "summary index" search
+
+| append  [| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ timeout=0 
+| search is_scheduled=1 
+| search disabled=0 
+| fields  title,cron_schedule,dispatch.earliest_time,dispatch.latest_time allow_skew schedule_priority realtime_schedule eai:acl.app,eai:acl.owner,search
+| rex field=search max_match=1000 "index\=\s*\"*\_*(?&lt;index&gt;\w+)\s*\"*" 
+
+
+
+
+
+| search $summary_index$ | rename index as "summary index" | eval tag="reads from summary index" | rename title as "savedsearch_name" | table savedsearch_name cron_schedule dispatch.earliest_time dispatch.latest_time allow_skew schedule_priority realtime_schedule eai:acl.app,eai:acl.owner tag "summary index" search ] | stats values("summary index") as "summary index" by  savedsearch_name cron_schedule  dispatch.earliest_time dispatch.latest_time allow_skew schedule_priority realtime_schedule eai:acl.app,eai:acl.owner tag search | search $si$ $tag$ | rename eai:acl.app as app eai:acl.owner as owner
+ |rename "summary index" as "summary index contained in:"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="ss">$click.value$</set>
+        </drilldown>
+      </table>
+      <html>
+        <p>Click savedsearch_name above to see dispatch latency.</p>
+
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$ss$">
+      <title>dispatch latency seconds</title>
+      <html>
+    <a data-unset-token="ss">Close this panel</a>
+  </html>
+      <table>
+        <title>dispatch latency for $ss$</title>
+        <search>
+          <query>`dmc_set_index_internal` search_group=dmc_group_search_head search_group=$group$ sourcetype=scheduler status="completed"  savedsearch_name=$ss$
+            | eval window_time = if(isnotnull(window_time), window_time, 0)
+            | eval execution_latency = max(dispatch_time - (scheduled_time + window_time), 0)
+            | stats max(execution_latency) as "latency seconds"  by savedsearch_name scheduled_time dispatch_time | convert ctime(scheduled_time) as scheduled_time ctime(dispatch_time) as dispatch_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$ss$">
+      <title>dispatch latency seconds</title>
+      <html>
+    <a data-unset-token="ss">Close this panel</a>
+  </html>
+      <chart>
+        <title>dispatch latency for $ss$</title>
+        <search>
+          <query>`dmc_set_index_internal` search_group=dmc_group_search_head search_group=$group$ sourcetype=scheduler status="completed"  savedsearch_name=$ss$
+            | eval window_time = if(isnotnull(window_time), window_time, 0)
+            | eval execution_latency = max(dispatch_time - (scheduled_time + window_time), 0)
+            | stats max(execution_latency) as latency_seconds  by savedsearch_name _time | timechart span=5m max(latency_seconds) by savedsearch_name</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>macro definitions for indexes which are summary indexes</title>
+      <table>
+        <title>$macro$</title>
+        <search>
+          <query>| rest splunk_server=$captain_name$  /services/configs/conf-macros | fields title definition | rex field=definition max_match=1000 "index\=\s*\"*\_*(?&lt;index&gt;\w+)\s*\"*" | search index=* | search $summary_index$ | table title definition index | rename title as "macro name"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>searches referencing a summary index through a macro</title>
+      <table>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ timeout=0 | search is_scheduled=1 | search disabled=0 | search $macro$ | fields  title, cron_schedule,dispatch.earliest_time dispatch.latest_time allow_skew schedule_priority realtime_schedule eai:acl.app,eai:acl.owner,action.summary_index action.summary_index._name search |eval tag=case('action.summary_index'=="0","reads from summary index", 'action.summary_index'=="1","writes to summary index") | rename title as savedsearch_name | rename action.summary_index._name as "summary index" | table savedsearch_name cron_schedule dispatch.earliest_time dispatch.latest_time allow_skew schedule_priority realtime_schedule eai:acl.app,eai:acl.owner tag  search "summary index" | rename eai:acl.app as app eai:acl.owner as owner</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="ss1">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$ss1$">
+      <title>dispatch latency seconds</title>
+      <html>
+    <a data-unset-token="ss1">Close this panel</a>
+    </html>
+      <table>
+        <title>dispatch latency for $ss1$</title>
+        <search>
+          <query>`dmc_set_index_internal` search_group=dmc_group_search_head search_group=$group$ sourcetype=scheduler status="completed"  savedsearch_name=$ss1$
+            | eval window_time = if(isnotnull(window_time), window_time, 0)
+            | eval execution_latency = max(dispatch_time - (scheduled_time + window_time), 0)
+            | stats max(execution_latency) as "latency seconds"  by savedsearch_name scheduled_time dispatch_time | convert ctime(scheduled_time) as scheduled_time ctime(dispatch_time) as dispatch_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$ss1$">
+      <title>dispatch latency seconds</title>
+      <html>
+    <a data-unset-token="ss1">Close this panel</a>
+    </html>
+      <chart>
+        <title>dispatch latency for $ss1$</title>
+        <search>
+          <query>`dmc_set_index_internal` search_group=dmc_group_search_head search_group=$group$ sourcetype=scheduler status="completed"  savedsearch_name=$ss1$
+            | eval window_time = if(isnotnull(window_time), window_time, 0)
+            | eval execution_latency = max(dispatch_time - (scheduled_time + window_time), 0)
+            | stats max(execution_latency) as latency_seconds  by savedsearch_name _time | timechart span=5m max(latency_seconds) by savedsearch_name</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+</form>
