@@ -1,6 +1,7 @@
 <form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="dark">
   <!--author: rphillips@splunk.com-->
   <label>email alert analysis shc</label>
+  <description>Install this view on the monitoring console in the splunk_monitoring_console app context</description>
   <search>
     <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
     <done>
