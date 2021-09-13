@@ -1,4 +1,5 @@
-<form theme="dark">
+<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="dark">
+  <!--author: rphillips@splunk.com-->
   <label>email alert analysis shc</label>
   <search>
     <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
@@ -68,12 +69,11 @@
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">100</option>
+        <option name="count">10</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">cell</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
         <drilldown>
@@ -87,12 +87,16 @@
     </panel>
   </row>
   <row>
-    <panel>
+    <panel depends="$a$">
+      <html>
+    <a data-unset-token="a">Close panels</a>
+  </html>
       <table>
         <title>search detail for $a$</title>
         <search>
           <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ | where is_scheduled=1 
- | search title="$a$" | table title cron_schedule schedule_priority allow_skew eai:acl.owner eai:acl.app search actions action.email.to alert_comparator alert_condition alert_threshold alert_type  | rename title as savedsearch_name  eai:acl.owner as owner eai:acl.app as app</query>
+ | search title="$a$" | table title cron_schedule schedule_priority allow_skew eai:acl.owner eai:acl.app search actions action.email.to alert_type  alert_comparator alert_threshold  alert_condition 
+  | rename title as savedsearch_name  eai:acl.owner as owner eai:acl.app as app</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -112,7 +116,7 @@
     </panel>
   </row>
   <row>
-    <panel>
+    <panel depends="$a$">
       <table>
         <title>when email alerts were fired for $a$</title>
         <search>
@@ -137,7 +141,7 @@
     </panel>
   </row>
   <row>
-    <panel>
+    <panel depends="$a$">
       <table>
         <title>when search artifact access attempts were made for $a$ (splunkd_ui_access.log)</title>
         <search>
@@ -167,7 +171,7 @@
     </panel>
   </row>
   <row>
-    <panel>
+    <panel depends="$a$">
       <table>
         <title>completed executions of $a$</title>
         <search>
@@ -188,7 +192,7 @@
     </panel>
   </row>
   <row>
-    <panel>
+    <panel depends="$a$">
       <chart>
         <title>scheduler status for $a$</title>
         <search>
