@@ -1,0 +1,192 @@
+<form>
+  <label>email alert analysis shc</label>
+  <search>
+    <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
+    <done>
+      <set token="captain_name">$result.captain_label$</set>
+    </done>
+  </search>
+  <search>
+    <query> | rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server  | eval host_list="\"".splunk_server."\""  | stats values(host_list) as host_list  | eval host_list=" (".mvjoin(host_list, ", ").")"</query>
+    <done>
+      <set token="host_list">$result.host_list$</set>
+    </done>
+  </search>
+  
+  
+  
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="dmc_group">
+      <label>Search Head Cluster:</label>
+      <showClearButton>false</showClearButton>
+      <populatingSearch fieldForLabel="label" fieldForValue="search_group">| `dmc_get_search_head_cluster_groups`</populatingSearch>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliest>-4h@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="30s">30s</choice>
+      <choice value="60s">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <prefix>span=</prefix>
+      <default>60s</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>compare how often an email alert is fired vs how often the search artifact is accessed</title>
+      <table>
+        <search>
+          <query>index=_internal host IN $host_list$ source=*splunkd_ui_access.log status!=303 
+| rex field=sid "scheduler__\S+__\S+__(?&lt;savedsearch_name&gt;\S+)\_at\_" 
+| stats count as "accessed" by savedsearch_name status 
+| append 
+    [ search index=_internal host IN $host_list$ sourcetype=splunk_python Sending email 
+    | rex field=results_link "scheduler__\S+__\S+\__(?&lt;savedsearch_name&gt;\S+)\_at\_" 
+    | stats count as "fired" by savedsearch_name] 
+| stats list(status) as status list(accessed) as accessed sum(accessed) as total_accessed max(fired) as fired by savedsearch_name 
+| foreach accessed, total_accessed,fired 
+    [ rex field=&lt;&lt;FIELD&gt;&gt; mode=sed "s/^[\r\n\s]+$$//" 
+    | eval &lt;&lt;FIELD&gt;&gt; = if(isnull(&lt;&lt;FIELD&gt;&gt;) OR len(&lt;&lt;FIELD&gt;&gt;)==0, "0", &lt;&lt;FIELD&gt;&gt;)] 
+| fillnull value="null" status 
+| eval access_ratio%=round((total_accessed/fired)*100,2) 
+| sort +"access_ratio%"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="a">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>search detail for $a$</title>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ | where is_scheduled=1 
+ | search title="$a$" | table title cron_schedule schedule_priority allow_skew eai:acl.owner eai:acl.app search actions action.email.to alert_comparator alert_condition alert_threshold alert_type  | rename title as savedsearch_name  eai:acl.owner as owner eai:acl.app as app</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="a1">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>completed executions of $a$</title>
+        <search>
+          <query>index=_audit sourcetype=audittrail host IN $host_list$ action=search info=completed savedsearch_name="$a$"  | convert ctime(exec_time) as exec_time ctime(search_et) as et ctime(search_lt) as lt | table search_id host _time savedsearch_name  exec_time event_count result_count total_run_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>when email alerts were fired for $a$</title>
+        <search>
+          <query>index=_internal  host IN $host_list$ sourcetype=splunk_python Sending email  | rex field=results_link "scheduler__\S+__\S+\__(?&lt;savedsearch_name&gt;\S+)\_at\_" | rename sid as search_id | table savedsearch_name search_id host _time subject results_link recipients server | search savedsearch_name="$a$"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>scheduler status for $a$</title>
+        <search>
+          <query>index=_internal   sourcetype=scheduler host IN $host_list$ savedsearch_name="$a$" status IN (skipped,continued,delayed,completed) | timechart $span$ count by status</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+</form>
