@@ -1,4 +1,4 @@
-<form>
+<form theme="dark">
   <label>email alert analysis shc</label>
   <search>
     <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
@@ -12,9 +12,6 @@
       <set token="host_list">$result.host_list$</set>
     </done>
   </search>
-  
-  
-  
   <fieldset autoRun="true" submitButton="false">
     <input type="dropdown" searchWhenChanged="true" token="dmc_group">
       <label>Search Head Cluster:</label>
@@ -47,13 +44,21 @@
         <search>
           <query>index=_internal host IN $host_list$ source=*splunkd_ui_access.log status!=303 
 | rex field=sid "scheduler__\S+__\S+__(?&lt;savedsearch_name&gt;\S+)\_at\_" 
-| stats count as "accessed" by savedsearch_name status 
-| append 
-    [ search index=_internal host IN $host_list$ sourcetype=splunk_python Sending email 
+| stats count as "accessed" by savedsearch_name status | rename savedsearch_name as ssn
+
+| append
+[search index=_internal host IN $host_list$ sourcetype=splunk_python Sending email 
     | rex field=results_link "scheduler__\S+__\S+\__(?&lt;savedsearch_name&gt;\S+)\_at\_" 
-    | stats count as "fired" by savedsearch_name] 
-| stats list(status) as status list(accessed) as accessed sum(accessed) as total_accessed max(fired) as fired by savedsearch_name 
-| foreach accessed, total_accessed,fired 
+    | stats count as "fired" by savedsearch_name | rename savedsearch_name as ssn]
+    
+    
+    
+ | join ssn   
+    [search index=_audit host IN $host_list$ sourcetype=audittrail action=search info=completed 
+ 
+    | rex "\'scheduler__\w+__\w+__(?&lt;ssn&gt;\S+)\_at"
+    | dedup   ssn savedsearch_name | table  savedsearch_name ssn]  | stats list(status) as status list(accessed) as accessed sum(accessed) as total_accessed max(fired) as fired by savedsearch_name
+    | foreach accessed, total_accessed,fired 
     [ rex field=&lt;&lt;FIELD&gt;&gt; mode=sed "s/^[\r\n\s]+$$//" 
     | eval &lt;&lt;FIELD&gt;&gt; = if(isnull(&lt;&lt;FIELD&gt;&gt;) OR len(&lt;&lt;FIELD&gt;&gt;)==0, "0", &lt;&lt;FIELD&gt;&gt;)] 
 | fillnull value="null" status 
@@ -75,6 +80,10 @@
           <set token="a">$click.value$</set>
         </drilldown>
       </table>
+      <html>
+        <p>Click on savedsearch_name to see alert details.</p>
+
+      </html>
     </panel>
   </row>
   <row>
@@ -105,9 +114,43 @@
   <row>
     <panel>
       <table>
-        <title>completed executions of $a$</title>
+        <title>when email alerts were fired for $a$</title>
         <search>
-          <query>index=_audit sourcetype=audittrail host IN $host_list$ action=search info=completed savedsearch_name="$a$"  | convert ctime(exec_time) as exec_time ctime(search_et) as et ctime(search_lt) as lt | table search_id host _time savedsearch_name  exec_time event_count result_count total_run_time</query>
+          <query>index=_internal  host IN $host_list$  sourcetype=splunk_python Sending email  | rex field=results_link "scheduler__\S+__\S+\__(?&lt;savedsearch_name&gt;\S+)\_at\_" | rename sid as search_id savedsearch_name as ssn 
+| join ssn
+[search index=_audit host IN $host_list$  sourcetype=audittrail action=search info=completed 
+ 
+    | rex "\'scheduler__\w+__\w+__(?&lt;ssn&gt;\S+)\_at"
+    | dedup   ssn savedsearch_name | table  savedsearch_name ssn] | table   _time host savedsearch_name search_id  subject results_link recipients server | search savedsearch_name="$a$"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>when search artifact access attempts were made for $a$ (splunkd_ui_access.log)</title>
+        <search>
+          <query>index=_internal host IN $host_list$ source=*splunkd_ui_access.log status!=303 
+| rex field=sid "scheduler__\S+__\S+__(?&lt;savedsearch_name&gt;\S+)\_at\_" 
+| rename savedsearch_name as ssn
+
+
+| join ssn
+[search index=_audit host IN $host_list$  sourcetype=audittrail action=search info=completed 
+ 
+    | rex "\'scheduler__\w+__\w+__(?&lt;ssn&gt;\S+)\_at"
+    | dedup   ssn savedsearch_name | table  savedsearch_name ssn] | table  _time host user clientip savedsearch_name sid status | search savedsearch_name="$a$"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -126,9 +169,9 @@
   <row>
     <panel>
       <table>
-        <title>when email alerts were fired for $a$</title>
+        <title>completed executions of $a$</title>
         <search>
-          <query>index=_internal  host IN $host_list$ sourcetype=splunk_python Sending email  | rex field=results_link "scheduler__\S+__\S+\__(?&lt;savedsearch_name&gt;\S+)\_at\_" | rename sid as search_id | table savedsearch_name search_id host _time subject results_link recipients server | search savedsearch_name="$a$"</query>
+          <query>index=_audit sourcetype=audittrail host IN $host_list$ action=search info=completed savedsearch_name="$a$"  | convert ctime(exec_time) as exec_time ctime(search_et) as et ctime(search_lt) as lt | table _time host savedsearch_name  search_id    exec_time event_count result_count total_run_time</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -138,7 +181,7 @@
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
         <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
+        <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
@@ -149,7 +192,7 @@
       <chart>
         <title>scheduler status for $a$</title>
         <search>
-          <query>index=_internal   sourcetype=scheduler host IN $host_list$ savedsearch_name="$a$" status IN (skipped,continued,delayed,completed) | timechart $span$ count by status</query>
+          <query>index=_internal   sourcetype=scheduler host IN $host_list$ savedsearch_name="$a$" status IN (skipped,continued,delayed,completed,deferred) | timechart $span$ count by status</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
