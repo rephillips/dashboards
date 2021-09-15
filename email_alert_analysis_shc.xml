@@ -95,7 +95,7 @@
       <table>
         <title>search detail for $a$</title>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain_name$ | where is_scheduled=1 
+          <query>| rest services/saved/searches splunk_server=$captain_name$ | fields title cron_schedule schedule_priority allow_skew eai:acl.owner eai:acl.app search actions action.email.to alert_type  alert_comparator alert_threshold  alert_condition
  | search title="$a$" | table title cron_schedule schedule_priority allow_skew eai:acl.owner eai:acl.app search actions action.email.to alert_type  alert_comparator alert_threshold  alert_condition 
   | rename title as savedsearch_name  eai:acl.owner as owner eai:acl.app as app</query>
           <earliest>$time.earliest$</earliest>
