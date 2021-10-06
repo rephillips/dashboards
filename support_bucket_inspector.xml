@@ -1,0 +1,339 @@
+<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="dark">
+  <!-- Author: Rob Phillips, rphillips@splunk.com -->
+  <label>support_bucket_inspector</label>
+  <search>
+    <query> | rest splunk_server_group=dmc_group_indexer splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server  | eval host_list="\"".splunk_server."\""  | stats values(host_list) as host_list  | eval host_list=" (".mvjoin(host_list, ", ").")"</query>
+    <done>
+      <set token="host_list">$result.host_list$</set>
+    </done>
+  </search>
+  <search>
+    <query> | rest splunk_server_group=dmc_group_cluster_master splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server</query>
+    <done>
+      <set token="cm">$result.splunk_server$</set>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="dmc_group">
+      <label>Group</label>
+      <showClearButton>false</showClearButton>
+      <search>
+        <query>| `dmc_get_groups_containing_role(dmc_group_indexer)`
+          | search search_group!="dmc_group_*"</query>
+      </search>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="30s">30s</choice>
+      <choice value="60s">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <prefix>span=</prefix>
+      <default>60s</default>
+    </input>
+    <input type="text" token="i" searchWhenChanged="true">
+      <label>index</label>
+    </input>
+    <input type="text" token="b" searchWhenChanged="true">
+      <label>bucketId</label>
+    </input>
+    <input type="checkbox" token="checked_config" searchWhenChanged="true">
+      <label></label>
+      <choice value="yes">show server info</choice>
+      <delimiter> </delimiter>
+      <change>
+        <condition value="yes">
+          <eval token="checked_result_value">"A"</eval>
+        </condition>
+        <condition>
+          <eval token="checked_result_value">"B"</eval>
+        </condition>
+      </change>
+    </input>
+    <input type="checkbox" token="cluster_config" searchWhenChanged="true">
+      <label></label>
+      <choice value="yes">show cluster config</choice>
+      <delimiter> </delimiter>
+      <change>
+        <condition value="yes">
+          <eval token="checked_result_value">"A"</eval>
+        </condition>
+        <condition>
+          <eval token="checked_result_value">"B"</eval>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel depends="$checked_config$">
+      <table>
+        <title>server info</title>
+        <search>
+          <query>| rest /services/server/sysinfo   splunk_server_group=$dmc_group$ | join splunk_server [| rest splunk_server_group="$dmc_group$" /services/server/info | search server_roles IN(cluster_master,indexer) ]   | table splunk_server,server_roles, version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state | sort +splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$cluster_config$">
+      <title>$cm$ cluster config for $dmc_group$</title>
+      <table>
+        <search>
+          <query>| rest splunk_server="$cm$" /services/cluster/config/config | transpose</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>cluster status</title>
+      <table>
+        <search>
+          <query>| rest splunk_server="$cm$" /services/cluster/master/peers | fields label, is_searchable, status, site, bucket_count, host_port_pair, last_heartbeat, replication_port, base_generation_id, title, bucket_count_by_index.*
+            | eval is_searchable = if(is_searchable == 1 or is_searchable == "1", "Yes", "No")
+            | `dmc_time_format(last_heartbeat)`
+            | sort - last_heartbeat
+            | search label="***"
+            | search is_searchable="*"
+            | search status="*"
+            | search site="*"
+            | fields label, is_searchable, status, site, bucket_count
+            | rename label as Peer, is_searchable as "Fully Searchable", status as Status, site as Site, bucket_count as Buckets</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>dbinspect for $b$</title>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <search>
+          <query>| dbinspect index=$i$ | search bucketId="$b$"</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>site0 primary server for bucket: $b$</title>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <title>A copy of a bucket is either searchable or non-searchable. Since a cluster can maintain multiple searchable copies of a bucket, the cluster needs a way to identify which copy participates in a search. To handle this, clusters use the concept of primacy. A searchable bucket copy is either primary or non-primary.</title>
+        <search>
+          <query>| rest /services/cluster/master/buckets/"$b$" splunk_server="$cm$" filter=index="$i$"
+    | search frozen=0 
+    | table title,bucket_size,origin_site,primaries_by_site.site0,*bucket_flags* 
+    | rename primaries_by_site.site0 as primary 
+    | table title,bucket_size,origin_site,primary 
+    | join type=left primary 
+        [| rest /services/cluster/master/peers splunk_server="$cm$" 
+        | table title label 
+        | rename title AS primary label as primary_server ] 
+    | table title,primary_server,origin_site
+    | rename title as bucketId</query>
+          <earliest>-30d@d</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>fix bucket</title>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <search>
+          <query>| makeresults 
+| eval command="curl -k -u admin:changeme https://localhost:8089/services/cluster/master/buckets/$b$/fix -X POST" 
+| eval host="$cm$"
+| eval action="Add the specified bucket to the fix list"
+| table host command action</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>roll bucket hot to warm</title>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <search>
+          <query>| makeresults 
+| eval command="curl -k -u admin:changeme https://localhost:8089/services/cluster/master/control/control/roll-hot-buckets -X POST -d \"bucket_id=$b$\""
+| eval host="$cm$"
+| eval action="Force a bucket to roll from hot to warm."
+| table host command action</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>splunkd.log events for $b$</title>
+      <input type="time" token="time2" searchWhenChanged="true">
+        <label></label>
+        <default>
+          <earliest>-35d@d</earliest>
+          <latest>now</latest>
+        </default>
+      </input>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <title>open panel in search, export results to csv and send to splunk support</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd source=*splunkd.log host IN $host_list$ OR host="$cm$" *$b$* | table _time host sourcetype log_level component  _raw</query>
+          <earliest>$time2.earliest$</earliest>
+          <latest>$time2.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>upload diags from these hosts</title>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <title>$SPLUNK_HOME/bin ./splunk diag</title>
+        <search>
+          <query>| rest splunk_server="$cm$" /services/cluster/master/buckets/$b$  | fields splunk_server | append [| dbinspect index="$i$" | search bucketId="$b$" | fields splunk_server] | table splunk_server</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>CM bucket endpoint https://$cm$:8089/services/cluster/master/buckets/$b$</title>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <title>open panel in search,  export results to csv and send to splunk support or open link above to CM mgmt port and save as pdf</title>
+        <search>
+          <query>| rest splunk_server="$cm$" /services/cluster/master/buckets/$b$  | transpose</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
