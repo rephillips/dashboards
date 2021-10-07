@@ -1,0 +1,480 @@
+<form hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js">
+  <!-- Author: Rob Phillips, rphillips@splunk.com -->
+  <label>support_shc_template_datamodel</label>
+  <search>
+    <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
+    <done>
+      <set token="captain_name">$result.captain_label$</set>
+    </done>
+  </search>
+  <search>
+    <query> | rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server  | eval host_list="\"".splunk_server."\""  | stats values(host_list) as host_list  | eval host_list=" (".mvjoin(host_list, ", ").")"</query>
+    <done>
+      <set token="host_list">$result.host_list$</set>
+    </done>
+  </search>
+  <search id="hostwide_memory">
+    <query>| tstats 
+    $hostwide_agg_function$(data.mem_used) as mem_used latest(data.mem) as capacity
+ where index=_introspection host IN $host_list$  sourcetype=splunk_resource_usage by host _time $span$
+</query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <search id="hostwide_load_avg">
+    <query>| tstats 
+    $hostwide_agg_function$(data.normalized_load_avg_1min) as normalized_load_avg_1min 
+ where index=_introspection  host IN $host_list$ sourcetype=splunk_resource_usage by  host _time $span$
+</query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <search id="iostats_await">
+    <query>| tstats $hostwide_agg_function$(data.avg_total_ms) as avg_total_ms where component::iostats index=_introspection host IN $host_list$ sourcetype=splunk_resource_usage
+    by host data.mount_point _time $span$
+    </query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="dmc_group">
+      <label>Search Head Cluster:</label>
+      <showClearButton>false</showClearButton>
+      <populatingSearch fieldForLabel="label" fieldForValue="search_group">| `dmc_get_search_head_cluster_groups`</populatingSearch>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="multiselect" searchWhenChanged="true" token="host">
+      <label>Instance</label>
+      <search>
+        <query>| inputlookup dmc_assets 
+| mvcombine search_group 
+| search search_group=$dmc_group$
+ | table host</query>
+      </search>
+      <delimiter>, </delimiter>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <prefix>(</prefix>
+      <suffix>)</suffix>
+      <choice value="*">All</choice>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="30s">30s</choice>
+      <choice value="60s">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <prefix>span=</prefix>
+      <default>60s</default>
+    </input>
+    <input type="checkbox" token="checked_config" searchWhenChanged="true">
+      <label></label>
+      <choice value="yes">show server info</choice>
+      <delimiter> </delimiter>
+      <change>
+        <condition value="yes">
+          <eval token="checked_result_value">"A"</eval>
+        </condition>
+        <condition>
+          <eval token="checked_result_value">"B"</eval>
+        </condition>
+      </change>
+    </input>
+    <input type="checkbox" token="checked_resource_usage" searchWhenChanged="true">
+      <label></label>
+      <choice value="yes">show resource usage</choice>
+      <delimiter> </delimiter>
+      <change>
+        <condition value="yes">
+          <eval token="checked_result_value">"A"</eval>
+        </condition>
+        <condition>
+          <eval token="checked_result_value">"B"</eval>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel depends="$checked_config$">
+      <table>
+        <title>server info</title>
+        <search>
+          <query>| rest /services/server/sysinfo  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$ | search splunk_server IN  $host_list$ | search splunk_server IN  $host$| join splunk_server [| rest /services/server/info  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$ | search splunk_server IN $host_list$ |search splunk_server IN  $host$ ]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state | sort +splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>shc captaincy timeline</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group="dmc_group_search_head" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd group=searchscheduler search_group=dmc_group_search_head search_group=*
+| eval state=if(delegated&gt;0, "captain", "non-captain")
+| search state="captain"
+| timechart  $span$ distinct_count(state) by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$checked_resource_usage$">
+      <input type="dropdown" token="hostwide_agg_function" searchWhenChanged="true">
+        <label>aggregation function</label>
+        <choice value="max">Max</choice>
+        <choice value="avg">Avg</choice>
+        <choice value="median">Median</choice>
+        <choice value="p90">90 percentile</choice>
+        <default>p90</default>
+        <initialValue>avg</initialValue>
+      </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Physical Memory Usage Deployment-Wide</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Shows maximum physical memory usage percentage across members of the selected group.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>Review Monitoring Console Resource Usage Instance views to determine the processes consuming the most memory.</p>
+          </html>
+      <html>
+        <p>Click chart for per host detail.</p>
+
+      </html>
+      <chart>
+        <search base="hostwide_memory">
+          <query>| search  host IN $host$ | timechart $span$ max(mem_used) as "memory_used" min(capacity) as "capacity_min" max(capacity) as "capacity_max"</query>
+        </search>
+        <option name="charting.axisTitleY.text">memory used MB</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.overlayFields">capacity_min,capacity_max</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">389</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="m1">$click.value2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$m1$">
+      <chart>
+        <title>$hostwide_agg_function$ Memory Usage MB - By Host</title>
+        <search base="hostwide_memory">
+          <query>| search  host IN $host$  | timechart $span$ max(mem_used) as "memory_used" latest(capacity) as "capacity" by host</query>
+        </search>
+        <option name="charting.axisTitleY.text">memory used MB</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">389</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+      <html>
+    <a data-unset-token="m1">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$checked_resource_usage$">
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Load Average Deployment-Wide</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> Shows maximum normalized 1m load avg based on physical cpu core count across all members of the selected group.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b>Sustained values above 1 are concerning (1=100% cpu system utilization), review Monitoring Console Resource Usage Instance views to determine the processes consuming the most cpu.</p>
+          </html>
+      <html>
+        <p>Click chart for per host detail.</p>
+
+      </html>
+      <chart>
+        <search base="hostwide_load_avg">
+          <query>| search  host IN $host$  | timechart $span$ max(normalized_load_avg_1min) as "normalized_load_avg_1min" | eval ceiling=1</query>
+        </search>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.overlayFields">ceiling</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">389</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="c1">$click.value2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$c1$">
+      <chart>
+        <title>$hostwide_agg_function$ Load Average - by host</title>
+        <search base="hostwide_load_avg">
+          <query>| search  host IN $host$  | timechart $span$ max(normalized_load_avg_1min) as "normalized_load_avg_1min" by host | eval ceiling=1</query>
+        </search>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.overlayFields">ceiling</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">389</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+      <html>
+    <a data-unset-token="c1">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$checked_resource_usage$">
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">Maximum Disk latency</span>  </b>
+
+        </h1>
+
+        <b>Description:</b> The average time (in milliseconds) for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+</html>
+      <html>
+        <p>
+          <b>Recommended Action:</b> Use to review Disk latency. Ideal await times for any mount point where Splunk operates is under 10ms</p>
+          </html>
+      <chart>
+        <search base="iostats_await">
+          <query>| search  host IN $host$ | timechart $span$ max(avg_total_ms) as "avg_total_ms" | eval ideal_latency_ms=10</query>
+        </search>
+        <option name="charting.axisTitleY.text">disk await (ms)</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.overlayFields">ideal_latency_ms</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">389</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="d1">$click.value2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$d1$">
+      <chart>
+        <title>$hostwide_agg_function$ Disk Latency - by host</title>
+        <search base="iostats_await">
+          <query>| search  host IN $host$| timechart $span$ max(avg_total_ms) as "avg_total_ms" by host  | eval ideal_latency_ms=10</query>
+        </search>
+        <option name="charting.axisTitleY.text">disk await (ms)</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.overlayFields">ideal_latency_ms</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">389</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="d2">$click.name2$</set>
+        </drilldown>
+      </chart>
+      <html>
+    <a data-unset-token="d1">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$d2$">
+      <chart>
+        <title>$hostwide_agg_function$ Disk Latency - by mount point</title>
+        <search base="iostats_await">
+          <query> | search host="$d2$" | timechart $span$ max(avg_total_ms) as "avg_total_ms" by data.mount_point  | eval ideal_latency_ms=10</query>
+        </search>
+        <option name="charting.axisTitleY.text">disk await (ms)</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.overlayFields">ideal_latency_ms</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="height">389</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+      <html>
+    <a data-unset-token="d2">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>datamodel completion %</title>
+      <table>
+        <search>
+          <query>| rest /services/admin/summarization by_tstats=t splunk_server=$captain_name$ count=0 
+| table eai:acl.app
+    summary.id
+    summary.is_inprogress, summary.complete 
+| rename eai:acl.app AS app
+    summary.id
+    AS name summary.complete AS completion summary.is_inprogress AS inprogress 
+| eval datamodel=substr(name, 4+len(app)+1) 
+| fields datamodel inprogress completion</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>datamodel/accleration endpoint</title>
+      <table>
+        <search>
+          <query>| rest splunk_server=$captain_name$ /services/datamodel/acceleration | fields title search</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="dma">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>audit.log for DMA</title>
+      <table>
+        <search>
+          <query>index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler savedsearch_name=*$dma$*  | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error savedsearch_name=*$dma$*  | dedup savedsearch_name  | table savedsearch_name ] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name  scheduled_time | sort +scheduled_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>audit log events</title>
+      <table>
+        <search>
+          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$ source=*audittrail*  action=search info=completed savedsearch_name=*ACCELERATE* savedsearch_name=*$dma$* search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count | sort +exec_time| fillnull search_lt value="now"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
