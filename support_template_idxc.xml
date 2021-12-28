@@ -7,6 +7,12 @@
       <set token="host_list">$result.host_list$</set>
     </done>
   </search>
+  <search>
+    <query>|rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$  /services/server/info | table  splunk_server</query>
+    <done>
+      <set token="cm">$result.splunk_server$</set>
+    </done>
+  </search>
   <search id="hostwide_memory">
     <query>| tstats 
     $hostwide_agg_function$(data.mem_used) as mem_used latest(data.mem) as capacity
@@ -103,6 +109,78 @@
       </change>
     </input>
   </fieldset>
+  <row>
+    <panel depends="$checked_config$">
+      <title>CM server.conf.</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/cluster_label | table splunk_server value
+ 
+| rename value as cluster_label 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/multisite | table splunk_server value
+    | rename value as multisite] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/heartbeat_timeout | table splunk_server value
+    | rename value as heartbeat_timeout] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/service_interval | table splunk_server value
+    | rename value as service_interval] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/site_replication_factor | table splunk_server value
+    | rename value as site_replication_factor] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/site_search_factor | table splunk_server value
+    | rename value as site_search_factor] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/replication_factor | table splunk_server value
+    | rename value as replication_factor] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/search_factor | table splunk_server value
+    | rename value as search_factor] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/available_sites | table splunk_server value
+    | rename value as available_sites] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/site_mappings | table splunk_server value
+    | rename value as site_mappings] 
+
+
+| eval stanza="clustering" 
+| eval conf="server.conf"
+
+ | table splunk_server cluster_label conf stanza multisite heartbeat_timeout replication_factor search_factor available_sites site_* service_interval</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
   <row>
     <panel depends="$checked_config$">
       <table>
@@ -499,8 +577,6 @@ component=BucketReplicator replication queue for full | timechart count by peer 
         <option name="trellis.size">medium</option>
       </chart>
     </panel>
-  </row>
-  <row>
     <panel>
       <input type="text" token="guid" searchWhenChanged="true">
         <label>guid</label>
@@ -573,8 +649,6 @@ by host _time span=30s
         <option name="trellis.size">medium</option>
       </chart>
     </panel>
-  </row>
-  <row>
     <panel>
       <title>RT searches</title>
       <chart>
@@ -623,6 +697,78 @@ by host _time span=30s
     </panel>
   </row>
   <row>
+    <panel>
+      <title>data ingest balance</title>
+      <input type="time" token="time2" searchWhenChanged="true">
+        <label></label>
+        <default>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </default>
+      </input>
+      <table>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$ sourcetype=splunkd source=*metrics.log name=index_thruput  | stats sum(kb) as kb by host | eval MB= round(kb/1024,0) | eval GB= round(kb/1024/1024,0) | table host MB GB</query>
+          <earliest>$time2.earliest$</earliest>
+          <latest>$time2.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Throughput KB/s</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd  source=*metrics.log TERM(name=thruput) | timechart span=1m partial=f per_second(kb) AS kbps by host 
+| eval kbps=round(kbps,0)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
     <panel>
       <title>new channel creation</title>
       <chart>
@@ -677,11 +823,65 @@ by host _time span=30s
   </row>
   <row>
     <panel>
-      <title>Throughput KB/s</title>
+      <title>search heads</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$  /services/cluster/master/searchheads
+          | fields label, status, site, host_port_pair, title | search label="***"
+            | search status="*"
+            | search site="*"
+            | rename label as "Search Head", status as Status, site as Site, host_port_pair as URI, title as GUID</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>bucket status</title>
+      <table>
+        <title>The primary_count_remote shows the number of primaries that the peer holds for non-local sites, including site0.</title>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/cluster/master/peers | fields label, is_searchable, status, site, bucket_count,primary_count_remote host_port_pair, last_heartbeat, replication_port, base_generation_id, title, bucket_count_by_index.*
+            | eval is_searchable = if(is_searchable == 1 or is_searchable == "1", "Yes", "No")
+            | `dmc_time_format(last_heartbeat)`
+            | sort - last_heartbeat
+            | search label="***"
+            | search is_searchable="*"
+            | search status="*"
+            | search site="*"
+            | fields label, is_searchable, status, site, bucket_count,primary_count_remote
+            | rename label as Peer, is_searchable as "Fully Searchable", status as Status, site as Site, bucket_count as Buckets</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>site0 primaries balance</title>
       <chart>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd  source=*metrics.log TERM(name=thruput) | timechart span=1m partial=f per_second(kb) AS kbps by host 
-| eval kbps=round(kbps,0)</query>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$ source=*metrics.log group=clustered_primaries_searches site=site0    | timechart $span$ max(latest_num_primaries) by host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -723,30 +923,76 @@ by host _time span=30s
   </row>
   <row>
     <panel>
-      <title>data ingest volume per peer</title>
-      <input type="time" token="time2" searchWhenChanged="true">
-        <label></label>
-        <default>
-          <earliest>-24h@h</earliest>
-          <latest>now</latest>
-        </default>
-      </input>
-      <table>
+      <title>CM Fixup tasks</title>
+      <chart>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$ sourcetype=splunkd source=*metrics.log name=index_thruput  | stats sum(kb) as kb by host | eval MB= round(kb/1024,0) | eval GB= round(kb/1024/1024,0) | table host kb MB GB</query>
-          <earliest>$time2.earliest$</earliest>
-          <latest>$time2.latest$</latest>
+          <query>|tstats
+max(PREFIX(to_fix_streaming=)) as to_fix_streaming
+max(PREFIX(to_fix_data_safety=)) as to_fix_data_safety
+max(PREFIX(to_fix_gen=)) as to_fix_gen
+max(PREFIX(to_fix_rep_factor=)) as to_fix_rep_factor
+max(PREFIX(to_fix_search_factor=)) as to_fix_search_factor
+max(PREFIX(to_fix_summary=)) as to_fix_summary
+max(PREFIX(to_fix_rebalance=)) as to_fix_rebalance
+max(PREFIX(to_fix_excess=)) as to_fix_excess
+max(PREFIX(to_fix_sync=)) as to_fix_sync
+max(PREFIX(to_fix_added=)) as to_fix_added
+max(PREFIX(to_fix_removed=)) as to_fix_removed
+max(PREFIX(to_fix_total=)) as to_fix_total
+where
+index=_internal host=$cm$
+sourcetype::splunkd TERM(name=cmmaster_service) TERM(group=subtask_counts)
+by host _time $span$
+| timechart $span$
+max(to_fix_streaming) as to_fix_streaming
+max(to_fix_data_safety) as to_fix_data_safety
+max(to_fix_gen) as to_fix_gen
+max(to_fix_rep_factor) as to_fix_rep_factor
+max(to_fix_search_factor) as to_fix_search_factor
+max(to_fix_summary) as to_fix_summary
+max(to_fix_rebalance) as to_fix_rebalance
+max(to_fix_excess) as to_fix_excess
+max(to_fix_sync) as to_fix_sync
+max(to_fix_added) as to_fix_added
+max(to_fix_removed) as to_fix_removed
+max(to_fix_total) as to_fix_total</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">10</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
         <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
     </panel>
   </row>
 </form>
