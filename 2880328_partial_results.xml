@@ -1,0 +1,268 @@
+<form hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js">
+  <!-- Author: Rob Phillips, rphillips@splunk.com -->
+  <label>2880328_partial_results</label>
+  <search>
+    <query> | rest splunk_server_group=dmc_group_indexer splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server  | eval host_list="\"".splunk_server."\""  | stats values(host_list) as host_list  | eval host_list=" (".mvjoin(host_list, ", ").")"</query>
+    <done>
+      <set token="host_list">$result.host_list$</set>
+    </done>
+  </search>
+  <search>
+    <query>|rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$  /services/server/info | table  splunk_server</query>
+    <done>
+      <set token="cm">$result.splunk_server$</set>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="dmc_group">
+      <label>Group</label>
+      <showClearButton>false</showClearButton>
+      <search>
+        <query>| `dmc_get_groups_containing_role(dmc_group_indexer)`
+          | search search_group!="dmc_group_*"</query>
+      </search>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="multiselect" searchWhenChanged="true" token="host">
+      <label>Instance</label>
+      <search>
+        <query>| inputlookup dmc_assets 
+| mvcombine search_group 
+| search search_group=$dmc_group$
+| where (search_group == "dmc_group_indexer") | table host</query>
+      </search>
+      <delimiter>, </delimiter>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <prefix>(</prefix>
+      <suffix>)</suffix>
+      <choice value="*">All</choice>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="30s">30s</choice>
+      <choice value="60s">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <prefix>span=</prefix>
+      <default>60s</default>
+    </input>
+    <input type="checkbox" token="checked_config" searchWhenChanged="true">
+      <label></label>
+      <choice value="yes">show server info</choice>
+      <delimiter> </delimiter>
+      <change>
+        <condition value="yes">
+          <eval token="checked_result_value">"A"</eval>
+        </condition>
+        <condition>
+          <eval token="checked_result_value">"B"</eval>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel depends="$checked_config$">
+      <title>CM server.conf</title>
+      <table>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/cluster_label | table splunk_server value
+ 
+| rename value as cluster_label 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/multisite | table splunk_server value
+    | rename value as multisite] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/heartbeat_timeout | table splunk_server value
+    | rename value as heartbeat_timeout] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/service_interval | table splunk_server value
+    | rename value as service_interval] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/site_replication_factor | table splunk_server value
+    | rename value as site_replication_factor] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/site_search_factor | table splunk_server value
+    | rename value as site_search_factor] 
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/replication_factor | table splunk_server value
+    | rename value as replication_factor] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/search_factor | table splunk_server value
+    | rename value as search_factor] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/available_sites | table splunk_server value
+    | rename value as available_sites] 
+
+
+
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/site_mappings | table splunk_server value
+    | rename value as site_mappings] 
+
+
+| eval stanza="clustering" 
+| eval conf="server.conf"
+
+ | table splunk_server cluster_label conf stanza multisite heartbeat_timeout replication_factor search_factor available_sites site_* service_interval</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$checked_config$">
+      <table>
+        <title>server info</title>
+        <search>
+          <query>| rest /services/server/sysinfo  splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ | search splunk_server IN  $host_list$ | search splunk_server IN  $host$| join splunk_server [| rest /services/server/info  splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ | search splunk_server IN $host_list$ |search splunk_server IN  $host$ ]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state | sort +splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Received Fatal Error from Remote Storage - distinct count of buckets by index</title>
+      <table>
+        <title>select index</title>
+        <search>
+          <query>index=_internal host=$cm$ sourcetype=splunkd source=*splunkd.log  "receive fatal error from remote storage" | rex "bid\=(?&lt;idx&gt;\w+)\~" | stats count by idx | addcoltotals</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="idx">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <title>Received Fatal Error from Remote Storage by bucketId</title>
+      <table>
+        <title>select bucket</title>
+        <search>
+          <query>index=_internal host=$cm$ sourcetype=splunkd source=*splunkd.log  "receive fatal error from remote storage"  | rex "bid\=(?&lt;idx&gt;\w+)\~" | search idx=$idx$ | rex "bid\=(?&lt;bid&gt;\S+)"  | stats count by bid | fields bid</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="bid">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>dbinspect bucket details</title>
+      <table>
+        <title>get bucket from remote storage: ./splunk cmd splunkd rfs getF bucket:$bid$</title>
+        <search>
+          <query>| dbinspect index=$idx$ | search bucketId=$bid$</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Bucket Age Range (count includes replicated copies)</title>
+      <input type="dropdown" token="i" searchWhenChanged="true">
+        <label>index</label>
+        <fieldForLabel>index</fieldForLabel>
+        <fieldForValue>index</fieldForValue>
+        <search>
+          <query>| tstats count WHERE index=*  BY index</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
+      <table>
+        <search>
+          <query>| dbinspect index="$i$" | eval bucket_age_days=(now()-endEpoch)/86400 
+| rangemap field=bucket_age_days "future"=-999999-0 "00_01_days"=0-1 "01_07_days"=1-7 "07_14_days"=7-14 "14_30_days"=14-30 "30_60_days"=30-60 "60_90_days"=60-90 "90+_days"=90-999999
+| chart dc(bucketId) by splunk_server range 
+| addtotals | addcoltotals</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">50</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
