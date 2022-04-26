@@ -1,10 +1,16 @@
 <form hideEdit="false" script="common_control.js" stylesheet="shared.css">
   <!-- Author: Rob Phillips, rphillips@splunk.com -->
   <label>support_hec</label>
+  <search>
+    <query> | rest splunk_server_group=dmc_group_indexer splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server  | eval host_list="\"".splunk_server."\""  | stats values(host_list) as host_list  | eval host_list=" (".mvjoin(host_list, ", ").")"</query>
+    <done>
+      <set token="host_list">$result.host_list$</set>
+    </done>
+  </search>
   <search id="hostwide_memory">
     <query>| tstats 
     $hostwide_agg_function$(data.mem_used) as mem_used latest(data.mem) as capacity
- where index=_introspection host IN $host$  sourcetype=splunk_resource_usage by host _time $span$
+ where index=_introspection host IN $host_list$  sourcetype=splunk_resource_usage by host _time $span$
 </query>
     <earliest>$time.earliest$</earliest>
     <latest>$time.latest$</latest>
@@ -12,14 +18,13 @@
   <search id="hostwide_load_avg">
     <query>| tstats 
     $hostwide_agg_function$(data.normalized_load_avg_1min) as normalized_load_avg_1min 
- 
- where index=_introspection  host IN $host$ sourcetype=splunk_resource_usage by  host _time $span$
+ where index=_introspection  host IN $host_list$ sourcetype=splunk_resource_usage by  host _time $span$
 </query>
     <earliest>$time.earliest$</earliest>
     <latest>$time.latest$</latest>
   </search>
   <search id="iostats_await">
-    <query>| tstats $hostwide_agg_function$(data.avg_total_ms) as avg_total_ms where component::iostats index=_introspection host IN $host$ sourcetype=splunk_resource_usage
+    <query>| tstats $hostwide_agg_function$(data.avg_total_ms) as avg_total_ms where component::iostats index=_introspection host IN $host_list$ sourcetype=splunk_resource_usage
     by host data.mount_point _time $span$
     </query>
     <earliest>$time.earliest$</earliest>
@@ -51,12 +56,14 @@
 | search search_group=$dmc_group$
 | where (search_group == "dmc_group_indexer") | table host</query>
       </search>
-      <delimiter>,</delimiter>
+      <delimiter>, </delimiter>
       <fieldForLabel>host</fieldForLabel>
       <fieldForValue>host</fieldForValue>
       <prefix>(</prefix>
       <suffix>)</suffix>
       <choice value="*">All</choice>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
     </input>
     <input type="time" searchWhenChanged="true" token="time">
       <label>Time Range:</label>
@@ -131,7 +138,6 @@
   <p/>
 
 </html>
-
     </panel>
   </row>
   <row>
@@ -152,7 +158,6 @@
       <table>
         <search>
           <query>| inputlookup HEC_reply_codes</query>
-        
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">50</option>
@@ -296,7 +301,7 @@
         <choice value="avg">Avg</choice>
         <choice value="median">Median</choice>
         <choice value="p90">90 percentile</choice>
-        <default>avg</default>
+        <default>p90</default>
         <initialValue>avg</initialValue>
       </input>
       <html>
@@ -318,7 +323,7 @@
       </html>
       <chart>
         <search base="hostwide_memory">
-          <query>| timechart $span$ max(mem_used) as "memory_used" min(capacity) as "capacity_min" max(capacity) as "capacity_max"</query>
+          <query>| search  host IN $host$ | timechart $span$ max(mem_used) as "memory_used" min(capacity) as "capacity_min" max(capacity) as "capacity_max"</query>
         </search>
         <option name="charting.axisTitleY.text">memory used MB</option>
         <option name="charting.axisY.minimumNumber">0</option>
@@ -340,7 +345,7 @@
       <chart>
         <title>$hostwide_agg_function$ Memory Usage MB - By Host</title>
         <search base="hostwide_memory">
-          <query>| timechart $span$ max(mem_used) as "memory_used" latest(capacity) as "capacity" by host </query>
+          <query>| search  host IN $host$ | timechart $span$ max(mem_used) as "memory_used" latest(capacity) as "capacity" by host </query>
         </search>
         <option name="charting.axisTitleY.text">memory used MB</option>
         <option name="charting.axisY.minimumNumber">0</option>
@@ -369,7 +374,7 @@
 </html>
       <html>
         <p>
-          <b>Recommended Action:</b>Sustained values above 1 are concerning (1=100% cpu system utilization), review Monitoring Console Resource Usage Instance views to determine the processes consuming the most cpu.</p>
+          <b>Recommended Action:</b>Sustained values above 1 are concerning , review Monitoring Console Resource Usage Instance views to determine the processes consuming the most cpu.</p>
           </html>
       <html>
         <p>Click chart for per host detail.</p>
@@ -377,7 +382,7 @@
       </html>
       <chart>
         <search base="hostwide_load_avg">
-          <query>| timechart $span$ max(normalized_load_avg_1min) as "normalized_load_avg_1min" | eval ceiling=1</query>
+          <query>| search  host IN $host$ | timechart $span$ max(normalized_load_avg_1min) as "normalized_load_avg_1min" | eval ceiling=1</query>
         </search>
         <option name="charting.axisY.minimumNumber">0</option>
         <option name="charting.axisY2.enabled">0</option>
@@ -398,7 +403,7 @@
       <chart>
         <title>$hostwide_agg_function$ Load Average - by host</title>
         <search base="hostwide_load_avg">
-          <query>| timechart $span$ max(normalized_load_avg_1min) as "normalized_load_avg_1min" by host | eval ceiling=1</query>
+          <query> | search  host IN $host$ | timechart $span$ max(normalized_load_avg_1min) as "normalized_load_avg_1min" by host | eval ceiling=1</query>
         </search>
         <option name="charting.axisY.minimumNumber">0</option>
         <option name="charting.axisY2.enabled">0</option>
@@ -431,7 +436,7 @@
           </html>
       <chart>
         <search base="iostats_await">
-          <query>| timechart $span$ max(avg_total_ms) as "avg_total_ms" | eval ideal_latency_ms=10</query>
+          <query> | search  host IN $host$ | timechart $span$ max(avg_total_ms) as "avg_total_ms" | eval ideal_latency_ms=10</query>
         </search>
         <option name="charting.axisTitleY.text">disk await (ms)</option>
         <option name="charting.axisY.minimumNumber">0</option>
@@ -454,7 +459,7 @@
       <chart>
         <title>$hostwide_agg_function$ Disk Latency - by host</title>
         <search base="iostats_await">
-          <query>| timechart $span$ max(avg_total_ms) as "avg_total_ms" by host  | eval ideal_latency_ms=10</query>
+          <query> | search  host IN $host$ | timechart $span$ max(avg_total_ms) as "avg_total_ms" by host  | eval ideal_latency_ms=10</query>
         </search>
         <option name="charting.axisTitleY.text">disk await (ms)</option>
         <option name="charting.axisY.minimumNumber">0</option>
@@ -478,7 +483,7 @@
   <row>
     <panel depends="$d2$">
       <chart>
-        <title>$hostwide_agg_function$ Disk Latency - by mount point</title>
+        <title>$hostwide_agg_function$ Disk Latency - by mount point : $d2$</title>
         <search base="iostats_await">
           <query> | search host="$d2$" | timechart $span$ max(avg_total_ms) as "avg_total_ms" by data.mount_point  | eval ideal_latency_ms=10</query>
         </search>
@@ -656,8 +661,7 @@
           </html>
       <chart>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd TERM(group=queue) 
-                       TERM(blocked=true)  | timechart $span$ minspan=30s count by host useother=f limit=0</query>
+          <query>| tstats prestats=t count where index=_internal  host IN $host_list$ sourcetype=splunkd source=*metrics.log TERM(blocked=true)  by _time host $span$ |  search  host IN $host$ | timechart $span$ minspan=30s count by host useother=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -708,7 +712,7 @@
       <chart>
         <title>blocked queues for $h1$ by queue name</title>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$  host=$h1$  sourcetype=splunkd  TERM(group=queue) 
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$   host IN ($h1$)  sourcetype=splunkd  TERM(group=queue) 
                        TERM(blocked=true)  | timechart span=60s minspan=30s count by name useother=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
@@ -790,9 +794,9 @@
           <query>| tstats
 sum(PREFIX(new_channels=)) as new_channels
 where
-index=_internal  host IN $host$  sourcetype::splunkd
+index=_internal  host IN $host_list$  sourcetype::splunkd
 TERM(group=map) TERM(name=pipelineinputchannel)
-by host _time span=30s
+by host _time span=30s | search host IN $host$
 | timechart span=30s max(new_channels) by host limit=0 useother=f
 | eval instance_channel_threshold=10000</query>
           <earliest>$time.earliest$</earliest>
@@ -845,7 +849,7 @@ by host _time span=30s
       <chart>
         <title>new channel creation by ingest_pipe on $h2$</title>
         <search>
-          <query>index=_internal  host IN $host$  sourcetype::splunkd host=$h2$    sourcetype=splunkd new_channels
+          <query>index=_internal  host IN $h2$  sourcetype::splunkd    sourcetype=splunkd new_channels
 | eval ingest_pipeline= if(isnull(ingest_pipe),0,ingest_pipe)
 | timechart span=30s max(new_channels) by ingest_pipeline limit=0 useother=f | eval pipeline_channel_threshold=5000</query>
           <earliest>$time.earliest$</earliest>
@@ -984,8 +988,8 @@ by host _time span=30s
 <p>
             <b>[input_channels]</b>
           </p>
-<p>max_inactive = 400000</p>
-<p>lowater_inactive = 390000</p>
+<p>max_inactive = 100000</p>
+<p>lowater_inactive = 90000</p>
 
 <p>
           <b style="color: #ED179F">server.conf:</b>
