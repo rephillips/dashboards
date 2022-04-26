@@ -226,8 +226,8 @@
         <fieldForValue>stanza</fieldForValue>
         <search>
           <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=$dmc_group$ /services/data/inputs/http | search title!=*streamfwd | search disabled=0 | search splunk_server IN $host$ | fields  title  | rename title as stanza | dedup stanza</query>
-          <earliest>-24h@h</earliest>
-          <latest>now</latest>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
         </search>
         <valuePrefix>"</valuePrefix>
         <valueSuffix>"</valueSuffix>
@@ -278,8 +278,8 @@
         <title>input_channels</title>
         <search>
           <query>| rest splunk_server_group=dmc_group_indexer splunk_server_group=dmc_indexerclustergroup_lab-cluster01 /services/properties/limits/input_channels/max_inactive  | search splunk_server IN $host$  | rename value as "max_inactive" | eval conf="limits.conf" | eval stanza="input_channels" | join splunk_server [| rest splunk_server_group=dmc_group_indexer splunk_server_group=dmc_indexerclustergroup_lab-cluster01   /services/properties/limits/input_channels/lowater_inactive | search splunk_server IN $host$ | rename value as "lowater_inactive" | eval conf="limits.conf" | eval stanza="input_channels" ] | table splunk_server conf stanza "max_inactive" "lowater_inactive"  | sort +splunk_server</query>
-          <earliest>-60m@m</earliest>
-          <latest>now</latest>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">100</option>
@@ -629,9 +629,9 @@
       <title>HttpDedicatedIoThread is busy and responded after x (ms)</title>
       <table>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=dmc_indexerclustergroup_lab-cluster01 host IN (rplinux-IDX1,rplinux-IDX2,rplinux-IDX3)  source=*watchdog.log name="'HttpDedicatedIoThread*'" finally received after | rex "finally received after (?&lt;ms&gt;\d+)\s+ms" | eval host_name=host.":".name | timechart span=60s max(ms) by host_name</query>
-          <earliest>-4h@m</earliest>
-          <latest>now</latest>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$  host IN $host$  source=*watchdog.log name="'HttpDedicatedIoThread*'" finally received after | rex "finally received after (?&lt;ms&gt;\d+)\s+ms" | eval host_name=host.":".name | timechart $span$ max(ms) by host_name</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">100</option>
@@ -713,7 +713,7 @@
         <title>blocked queues for $h1$ by queue name</title>
         <search>
           <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$   host IN ($h1$)  sourcetype=splunkd  TERM(group=queue) 
-                       TERM(blocked=true)  | timechart span=60s minspan=30s count by name useother=f limit=0</query>
+                       TERM(blocked=true)  | timechart $span$ minspan=30s count by name useother=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -780,8 +780,8 @@
 
 <p>limits.conf:</p>
 <p>[input_channels]</p>
-<p>max_inactive = 400000</p>
-<p>lowater_inactive = 390000</p>
+<p>max_inactive = 100000</p>
+<p>lowater_inactive = 90000</p>
 </p>
 
 
@@ -849,9 +849,9 @@ by host _time span=30s | search host IN $host$
       <chart>
         <title>new channel creation by ingest_pipe on $h2$</title>
         <search>
-          <query>index=_internal  host IN $h2$  sourcetype::splunkd    sourcetype=splunkd new_channels
+          <query>index=_internal  host IN ($h2$)  sourcetype::splunkd    sourcetype=splunkd new_channels
 | eval ingest_pipeline= if(isnull(ingest_pipe),0,ingest_pipe)
-| timechart span=30s max(new_channels) by ingest_pipeline limit=0 useother=f | eval pipeline_channel_threshold=5000</query>
+| timechart $span$ max(new_channels) by ingest_pipeline limit=0 useother=f | eval pipeline_channel_threshold=5000</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -909,7 +909,7 @@ by host _time span=30s | search host IN $host$
           </html>
       <chart>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd  TERM(name=thruput) | timechart span=1m partial=f per_second(kb) AS kbps by host 
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd  TERM(name=thruput) | timechart $span$ partial=f per_second(kb) AS kbps by host 
 | eval kbps=round(kbps,0) | eval ceiling=20000</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
