@@ -1,7 +1,7 @@
 <form version="1.1" hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js" theme="light">
   <!-- Author: Rob Phillips, rphillips@splunk.com -->
   <label>support_shc_log_export</label>
-  <description>select a Time Range where the scheduler issue occured + / - 15m. Open each *.log panel in search and export to csv for Splunk Support. Logs from all SHC members will be collected.</description>
+  <description>select a Time Range where the scheduler issue occured + / - 15m. Open each *.log panel in search and export to csv for Splunk Support. Logs from all SHC members will be collected. Install this view on the Monitoring Console splunk_monitoring_console app context</description>
   <search>
     <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
     <done>
@@ -303,11 +303,10 @@ status=* | timechart span=1m count by status</query>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">100</option>
+        <option name="count">1</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
