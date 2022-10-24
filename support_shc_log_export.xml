@@ -39,6 +39,27 @@
   </fieldset>
   <row>
     <panel>
+      <title>shc member server info</title>
+      <table>
+        <search>
+          <query>| rest /services/server/sysinfo  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$  | join splunk_server [| rest /services/server/info  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$  ]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state guid | sort +splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>captaincy timeline</title>
       <chart>
         <title>collect diag from current captain: $captain_name$</title>
