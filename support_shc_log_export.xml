@@ -1,0 +1,346 @@
+<form version="1.1" hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js" theme="light">
+  <!-- Author: Rob Phillips, rphillips@splunk.com -->
+  <label>support_shc_log_export</label>
+  <description>select a Time Range where the scheduler issue occured + / - 15m. Open each *.log panel in search and export to csv for Splunk Support. Logs from all SHC members will be collected.</description>
+  <search>
+    <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
+    <done>
+      <set token="captain_name">$result.captain_label$</set>
+    </done>
+  </search>
+  <search>
+    <query> | rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server  | eval host_list="\"".splunk_server."\""  | stats values(host_list) as host_list  | eval host_list=" (".mvjoin(host_list, ", ").")"</query>
+    <done>
+      <set token="host_list">$result.host_list$</set>
+    </done>
+  </search>
+  <search id="hostwide_memory">
+    <query>| tstats 
+    $hostwide_agg_function$(data.mem_used) as mem_used latest(data.mem) as capacity
+ where index=_introspection host IN $host_list$  sourcetype=splunk_resource_usage by host _time $span$
+</query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <search id="hostwide_load_avg">
+    <query>| tstats 
+    $hostwide_agg_function$(data.normalized_load_avg_1min) as normalized_load_avg_1min 
+ where index=_introspection  host IN $host_list$ sourcetype=splunk_resource_usage by  host _time $span$
+</query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <search id="iostats_await">
+    <query>| tstats $hostwide_agg_function$(data.avg_total_ms) as avg_total_ms where component::iostats index=_introspection host IN $host_list$ sourcetype=splunk_resource_usage
+    by host data.mount_point _time $span$
+    </query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="dmc_group">
+      <label>Group</label>
+      <showClearButton>false</showClearButton>
+      <search>
+        <query>| `dmc_get_search_head_cluster_groups`</query>
+      </search>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="30s">30s</choice>
+      <choice value="60s">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <prefix>span=</prefix>
+      <default>60s</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>captaincy timeline</title>
+      <chart>
+        <title>collect diag from current captain: $captain_name$</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd source=*/metrics.log group=searchscheduler search_group=dmc_group_search_head search_group="$dmc_group$"
+| eval state=if(delegated&gt;0, "captain", "non-captain")
+| search state="captain"
+| timechart $span$ distinct_count(state) by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="h1">$click.name2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>scheduler status</title>
+      <chart>
+        <search>
+          <query>index=_internal sourcetype=scheduler source=*/scheduler.log  search_group=dmc_group_search_head search_group="$dmc_group$"
+status=* | timechart span=1m count by status</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>splunkd.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd source=*/splunkd.log  search_group=dmc_group_search_head search_group="$dmc_group$"   | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>metrics.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd source=*/metrics.log  search_group=dmc_group_search_head search_group="$dmc_group$"  | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>scheduler.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=scheduler source=*/scheduler.log search_group=dmc_group_search_head search_group="$dmc_group$" | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>audit.log</title>
+      <table>
+        <search>
+          <query>index=_audit sourcetype=audittrail  search_group=dmc_group_search_head search_group="$dmc_group$" | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>splunkd_access.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd_access source=*/splunkd_access.log search_group=dmc_group_search_head search_group="$dmc_group$" | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>resource_usage.log</title>
+      <table>
+        <search>
+          <query>index=_introspection sourcetype=splunk_resource_usage source=*/resource_usage.log search_group=dmc_group_search_head search_group="$dmc_group$" | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>watchdog.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd source=*/watchdog.log search_group=dmc_group_search_head search_group="$dmc_group$" | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>conf.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd_conf source=*/conf.log search_group=dmc_group_search_head search_group="$dmc_group$" | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>mongod.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=mongod source=*/mongod.log search_group=dmc_group_search_head search_group="$dmc_group$" | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
