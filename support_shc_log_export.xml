@@ -8,38 +8,9 @@
       <set token="captain_name">$result.captain_label$</set>
     </done>
   </search>
-  <search>
-    <query> | rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$" /services/server/info | fields + splunk_server  | eval host_list="\"".splunk_server."\""  | stats values(host_list) as host_list  | eval host_list=" (".mvjoin(host_list, ", ").")"</query>
-    <done>
-      <set token="host_list">$result.host_list$</set>
-    </done>
-  </search>
-  <search id="hostwide_memory">
-    <query>| tstats 
-    $hostwide_agg_function$(data.mem_used) as mem_used latest(data.mem) as capacity
- where index=_introspection host IN $host_list$  sourcetype=splunk_resource_usage by host _time $span$
-</query>
-    <earliest>$time.earliest$</earliest>
-    <latest>$time.latest$</latest>
-  </search>
-  <search id="hostwide_load_avg">
-    <query>| tstats 
-    $hostwide_agg_function$(data.normalized_load_avg_1min) as normalized_load_avg_1min 
- where index=_introspection  host IN $host_list$ sourcetype=splunk_resource_usage by  host _time $span$
-</query>
-    <earliest>$time.earliest$</earliest>
-    <latest>$time.latest$</latest>
-  </search>
-  <search id="iostats_await">
-    <query>| tstats $hostwide_agg_function$(data.avg_total_ms) as avg_total_ms where component::iostats index=_introspection host IN $host_list$ sourcetype=splunk_resource_usage
-    by host data.mount_point _time $span$
-    </query>
-    <earliest>$time.earliest$</earliest>
-    <latest>$time.latest$</latest>
-  </search>
   <fieldset autoRun="true" submitButton="false">
     <input type="dropdown" searchWhenChanged="true" token="dmc_group">
-      <label>Group</label>
+      <label>select shc group</label>
       <showClearButton>false</showClearButton>
       <search>
         <query>| `dmc_get_search_head_cluster_groups`</query>
