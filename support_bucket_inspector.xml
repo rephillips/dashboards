@@ -1,4 +1,4 @@
-<form version="1.1" hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="dark">
+<form version="1.1" hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
   <!-- Author: Rob Phillips, rphillips@splunk.com -->
   <label>support_bucket_inspector</label>
   <search>
@@ -85,11 +85,10 @@
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">5</option>
+        <option name="count">3</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">true</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -122,7 +121,7 @@
       <title>cluster status</title>
       <table>
         <search>
-          <query>| rest splunk_server="$cm$" /services/cluster/master/peers | fields label, is_searchable, status, site, bucket_count, host_port_pair, last_heartbeat, replication_port, base_generation_id, title, bucket_count_by_index.*
+          <query>| rest splunk_server="$cm$" /services/cluster/manager/peers | fields label, is_searchable, status, site, bucket_count, host_port_pair, last_heartbeat, replication_port, base_generation_id, title, bucket_count_by_index.*
             | eval is_searchable = if(is_searchable == 1 or is_searchable == "1", "Yes", "No")
             | `dmc_time_format(last_heartbeat)`
             | sort - last_heartbeat
@@ -180,13 +179,13 @@
       <table>
         <title>A copy of a bucket is either searchable or non-searchable. Since a cluster can maintain multiple searchable copies of a bucket, the cluster needs a way to identify which copy participates in a search. To handle this, clusters use the concept of primacy. A searchable bucket copy is either primary or non-primary.</title>
         <search>
-          <query>| rest /services/cluster/master/buckets/"$b$" splunk_server="$cm$" filter=index="$i$"
+          <query>| rest /services/cluster/manager/buckets/"$b$" splunk_server="$cm$" filter=index="$i$"
     | search frozen=0 
     | table title,bucket_size,origin_site,primaries_by_site.site0,*bucket_flags* 
     | rename primaries_by_site.site0 as primary 
     | table title,bucket_size,origin_site,primary 
     | join type=left primary 
-        [| rest /services/cluster/master/peers splunk_server="$cm$" 
+        [| rest /services/cluster/manager/peers splunk_server="$cm$" 
         | table title label 
         | rename title AS primary label as primary_server ] 
     | table title,primary_server,origin_site
@@ -215,7 +214,7 @@
       <table>
         <search>
           <query>| makeresults 
-| eval command="curl -k -u admin:changeme https://localhost:8089/services/cluster/master/buckets/$b$/fix -X POST" 
+| eval command="curl -k -u admin:password https://localhost:8089/services/cluster/manager/buckets/$b$/fix -X POST" 
 | eval host="$cm$"
 | eval action="Add the specified bucket to the fix list"
 | table host command action</query>
@@ -243,9 +242,37 @@
       <table>
         <search>
           <query>| makeresults 
-| eval command="curl -k -u admin:changeme https://localhost:8089/services/cluster/master/control/control/roll-hot-buckets -X POST -d \"bucket_id=$b$\""
+| eval command="curl -k -u admin:password https://localhost:8089/services/cluster/manager/control/control/roll-hot-buckets -X POST -d \"bucket_id=$b$\""
 | eval host="$cm$"
 | eval action="Force a bucket to roll from hot to warm."
+| table host command action</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$b$">
+      <title>remove bucket from peer</title>
+      <html>
+    <a data-unset-token="b">Close panels</a>
+  </html>
+      <table>
+        <search>
+          <query>| makeresults 
+| eval command="curl -k -u admin:password https://localhost:8089/services/cluster/manager/buckets/$b$/remove_from_peer -X POST -d peer=peer_guid"
+| eval host="$cm$"
+| eval action="Deletes the copy of this bucket from specified peer"
 | table host command action</query>
           <earliest>-60m@m</earliest>
           <latest>now</latest>
@@ -283,6 +310,7 @@
           <latest>$time2.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
+        <option name="count">5</option>
         <option name="drilldown">none</option>
       </table>
     </panel>
@@ -321,7 +349,7 @@
       <table>
         <title>open panel in search,  export results to csv and send to splunk support or open link above to CM mgmt port and save as pdf</title>
         <search>
-          <query>| rest splunk_server="$cm$" /services/cluster/master/buckets/$b$  | transpose</query>
+          <query>| rest splunk_server="$cm$" /services/cluster/manager/buckets/$b$  | transpose</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -330,6 +358,7 @@
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
