@@ -1,4 +1,4 @@
-<form hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js">
+<form version="1.1" hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js">
   <!-- Author: Rob Phillips, rphillips@splunk.com -->
   <label>support_shc_template_datamodel</label>
   <search>
@@ -59,6 +59,20 @@
       <choice value="*">All</choice>
       <valuePrefix>"</valuePrefix>
       <valueSuffix>"</valueSuffix>
+      <default>*</default>
+    </input>
+    <input type="multiselect" token="dma" searchWhenChanged="true">
+      <label>datamodel</label>
+      <choice value="*">All</choice>
+      <fieldForLabel>title</fieldForLabel>
+      <fieldForValue>title</fieldForValue>
+      <search>
+        <query>| rest splunk_server=$captain_name$ /services/datamodel/acceleration | search acceleration=1  | table title</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <delimiter>, </delimiter>
+      <default>*</default>
     </input>
     <input type="time" searchWhenChanged="true" token="time">
       <label>Time Range:</label>
@@ -105,27 +119,6 @@
     </input>
   </fieldset>
   <row>
-    <panel depends="$checked_config$">
-      <table>
-        <title>server info</title>
-        <search>
-          <query>| rest /services/server/sysinfo  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$ | search splunk_server IN  $host_list$ | search splunk_server IN  $host$| join splunk_server [| rest /services/server/info  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$ | search splunk_server IN $host_list$ |search splunk_server IN  $host$ ]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state | sort +splunk_server</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="count">5</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">true</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
-    </panel>
-  </row>
-  <row>
     <panel>
       <title>shc captaincy timeline</title>
       <chart>
@@ -171,6 +164,47 @@
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>accelerated datamodels</title>
+      <table>
+        <search>
+          <query>| rest splunk_server=$captain_name$ /services/datamodel/acceleration | search acceleration=1 | search title IN($dma$) | table title acceleration.cron_schedule acceleration.backfill_time acceleration.earliest_time acceleration.max_concurrent acceleration.max_time search</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">100</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$checked_config$">
+      <table>
+        <title>server info</title>
+        <search>
+          <query>| rest /services/server/sysinfo  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$ | search splunk_server IN  $host_list$ | search splunk_server IN  $host$| join splunk_server [| rest /services/server/info  splunk_server_group=dmc_group_search_head splunk_server_group=$dmc_group$ | search splunk_server IN $host_list$ |search splunk_server IN  $host$ ]   | table splunk_server version  numberOfCores, numberOfVirtualCores  physicalMemoryMB ulimits.open_files  transparent_hugepages.effective_state | sort +splunk_server</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
   <row>
@@ -396,7 +430,7 @@
     summary.id
     AS name summary.complete AS completion summary.is_inprogress AS inprogress 
 | eval datamodel=substr(name, 4+len(app)+1) 
-| fields datamodel inprogress completion</query>
+| fields datamodel inprogress completion | rename datamodel as title | search title IN ($dma$)</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -414,33 +448,48 @@
   </row>
   <row>
     <panel>
-      <title>datamodel/accleration endpoint</title>
       <table>
+        <title>Datamodels and Eventtypes - Ideally, Eventtypes Should Include an Index Definition if Possible</title>
         <search>
-          <query>| rest splunk_server=$captain_name$ /services/datamodel/acceleration | fields title search</query>
-          <earliest>-60m@m</earliest>
-          <latest>now</latest>
+          <query>| rest /services/datamodel/model splunk_server=$captain_name$
+| search acceleration="*enabled*:true*" 
+| fields title description acceleration |search title IN($dma$)
+| where like(acceleration,"%false%") 
+| rex field=description "\{\"search\":\"(?&lt;constraint&gt;[^\"]+)\"" 
+| fields title constraint 
+| rex field=constraint "\(\`cim_(?&lt;cim_macro_name&gt;.*?)_indexes\`\)" 
+| join type=outer cim_macro_name 
+    [| rest /services/admin/macros splunk_server=$captain_name$ 
+    | search eai:acl.app=Splunk_SA_CIM title=cim*_indexes 
+    |search title IN($dma$)
+    | fields title definition 
+    | rex field=title "cim_(?&lt;cim_macro_name&gt;.*?)_indexes" 
+    | rex max_match=0 field=definition "index=(?&lt;indexes_searched&gt;\w+)" 
+    | fields cim_macro_name indexes_searched] 
+| eval constraint=replace(constraint,"\(\`cim_[^\`]+\`\)",coalesce(indexes_searched,"")) 
+| fields - indexes_searched cim_macro_name 
+| rex max_match=0 field=constraint "index=(?&lt;indexes_searched&gt;[^\s,\)]+)"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">100</option>
         <option name="dataOverlayMode">none</option>
-        <option name="drilldown">cell</option>
+        <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
-        <drilldown>
-          <set token="dma">$click.value$</set>
-        </drilldown>
       </table>
     </panel>
   </row>
   <row>
     <panel>
-      <title>audit.log for DMA</title>
+      <title>scheduler status for datamodel: $dma$</title>
       <table>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler savedsearch_name=*$dma$*  | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error savedsearch_name=*$dma$*  | dedup savedsearch_name  | table savedsearch_name ] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name  scheduled_time | sort +scheduled_time</query>
+          <query>index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler savedsearch_name IN (*$dma$*)  | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler    savedsearch_name IN (*$dma$*)  | table savedsearch_name ] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name  scheduled_time | sort +scheduled_time</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -458,15 +507,15 @@
   </row>
   <row>
     <panel>
-      <title>audit log events</title>
+      <title>audit log events for datamodel: $dma$</title>
       <table>
         <search>
-          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$ source=*audittrail*  action=search info=completed savedsearch_name=*ACCELERATE* savedsearch_name=*$dma$* search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count | sort +exec_time| fillnull search_lt value="now"</query>
+          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$ source=*audittrail*  action=search  savedsearch_name IN (*$dma$*) search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id info | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count info| sort +exec_time| fillnull search_lt value="now"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">10</option>
+        <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
@@ -475,6 +524,52 @@
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>total_run_time for datamodel: $dma$</title>
+      <chart>
+        <search>
+          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$  source=*audittrail*  action=search  info=completed savedsearch_name IN (*$dma$*) search_id!=*rsa_*  |timechart span=5m max(total_run_time) by id usenull=f limit=0 | eval ceiling=300</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.overlayFields">ceiling</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
     </panel>
   </row>
 </form>
