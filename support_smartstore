@@ -193,10 +193,67 @@
         </search>
         <option name="count">5</option>
         <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="indexer">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$indexer$">
+      <table>
+        <title>indexer: $indexer$ server.conf</title>
+        <search>
+          <query>| rest splunk_server=$indexer$ /services/properties/server/cachemanager/eviction_padding 
+| rename value as eviction_padding 
+| join splunk_server 
+    [| rest splunk_server=$indexer$ /services/properties/server/cachemanager/max_cache_size 
+    | rename value as max_cache_size] 
+    
+
+
+| table eviction_padding max_cache_size max_concurrent_downloads max_concurrent_uploads
+| transpose 
+| rename column as "[cachemanager]" 
+| rename "row 1" as value</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
         <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$indexer$">
+      <table>
+        <search>
+          <query>| rest splunk_server=$indexer$ /services/properties/server/diskUsage/minFreeSpace
+| rename value as minFreeSpace 
+    | table minFreeSpace | fillnull value="-" | transpose | rename column as "[diskUsage]" | rename "row 1" as " "</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
@@ -414,61 +471,101 @@
   </row>
   <row>
     <panel>
-      <title>bad searches triggering bucket downloads from S3 storage</title>
-      <table>
+      <title>cache manager download rate</title>
+      <chart>
         <search>
-          <query>(index=_audit 
-    [ inputlookup splunk-servers 
-    | search splunk-component="Search Head" 
-    | fields host] (action=search info=granted OR info=completed OR info=canceled OR info=failed) search_id NOT typeahead NOT SummaryDirector NOT _ACCELERATE_DM* NOT rsa_scheduler*)
-    OR
-    (index=_introspection provenance) 
-| rename data.search_props.sid AS sid data.search_props.provenance AS provenance data.search_props.type AS search_type data.search_props.app AS app 
-```| rex max_match=200000 "search=\'(?&lt;thesearch&gt;(?:\n|.)*?)\'\, autojoin"```
-| rex max_match=1000 field=search "(?:[^\"\']|^)index=(?&lt;indexes&gt;[^\s\=\)\"]+)" 
-| rex max_match=1000 field=search "tag=(?&lt;tags&gt;[^\s+\||\)]+)" 
-| rex max_match=1000 field=search "eventtype=(?&lt;eventtypes&gt;[^\s+\||\)]+)" 
-| rex max_match=1000 field=search "(?&lt;macros&gt;\`[^\s]+\`)" 
-| eval secs=(search_lt-search_et) 
-| eval string_dur = tostring(round(secs), "duration") 
-| eval formatted_dur = replace(string_dur,"(?:(\d+)\+)?0?(\d+):0?(\d+):0?(\d+)","\1d \2h \3m \4s") 
-| eval result=replace(formatted_dur, "^d (0h (0m )?)?","") 
-| eval search_id=trim(search_id,"\'") 
-| eval search_id=coalesce(search_id,sid) 
-| eval origSid=search_id 
-| rex field=search_id ".*ubsearch_(?&lt;search_id&gt;.*)_\d+\.\d+" 
-| eval api_et=if(api_et="N/A", search_et, api_et) 
-| search NOT search_id="*tmp*" 
-| stats earliest(_time) AS _time sum(duration_command_search_*_bucketcache_miss) AS duration_*_bucketcache_miss sum(invocations_command_search_*_bucketcache_miss) AS invocations_*_bucketcache_miss values(result) AS total_historical_days_searched values(host) AS host values(user) AS user values(indexes) AS indexes values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags values(thesearch) AS search values(savedsearch_name) AS savedsearch_name max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS status values(provenance) AS provenance values(app) AS app values(search_type) AS search_type dc(origSid) AS numofsearchesinquery by search_id 
-| fields _time status host duration_index_bucketcache_miss duration_rawdata_bucketcache_miss invocations_index_bucketcache_miss invocations_rawdata_bucketcache_miss total_historical_days_searched run_time user provenance app search_type savedsearch_name search indexes macros eventtypes tags result_count event_count searched_buckets numofsearchesinquery search_id 
-| fillnull value="All Time" total_historical_days_searched 
-| eval total_bad_metrics=duration_index_bucketcache_miss+duration_rawdata_bucketcache_miss+invocations_index_bucketcache_miss+invocations_rawdata_bucketcache_miss 
-| eval savedsearch_name=if(like(provenance,"%:Dashboard:%"),NULL,savedsearch_name) 
-| eval search_type=if(like(provenance,"%:Dashboard:%"),"ad-hoc dashboard",search_type) 
-| sort - total_bad_metrics 
-| where total_bad_metrics &gt; 5000</query>
+          <query>index=_internal  host IN $host_list$ host IN $host$ source=*metrics.log* group=cachemgr_download kb
+| timechart $span$ partial=f limit=50 per_second(kb) as kbps by host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">5</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">KB/s</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
         <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">true</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>cache manager upload rate</title>
+      <chart>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$ source=*metrics.log* group=cachemgr_upload kb |timechart $span$ partial=f limit=50 per_second(kb) as kbps by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">KB/s</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
     </panel>
   </row>
   <row>
     <panel>
-      <title>bucket download by index</title>
+      <title>Cache Hits/Misses</title>
       <chart>
         <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$  sourcetype=splunkd source=*/splunkd.log
- component=Cache* action=download download_set=*journal_gz* OR download_set=*tsidx* | rex "cache_id\=\"\w+\|(?&lt;i&gt;\S+)\~\d+\~"  | timechart $span$ dc(cache_id) by i limit=10 useother=f</query>
+          <query>index=_internal  host IN $host_list$ host IN $host$ group=cachemgr_bucket source=*metrics.log | timechart $span$ count(cache_hit) as Hits count(cache_miss) as Misses</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -485,15 +582,57 @@
         <option name="charting.axisY2.abbreviation">none</option>
         <option name="charting.axisY2.enabled">0</option>
         <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">column</option>
+        <option name="charting.chart">line</option>
         <option name="charting.chart.bubbleMaximumSize">50</option>
         <option name="charting.chart.bubbleMinimumSize">10</option>
         <option name="charting.chart.bubbleSizeBy">area</option>
         <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.overlayFields">instance_channel_threshold</option>
         <option name="charting.chart.showDataLabels">none</option>
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>buckets evicted</title>
+      <chart>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$ source=*metrics.log* group=spacemgr  evicted | timechart $span$ sum(evicted) as Evicted</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
         <option name="charting.chart.style">shiny</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
@@ -552,6 +691,282 @@
         <option name="trellis.enabled">0</option>
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Cache Thrash by Index</title>
+      <table>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$ source=*splunkd.log* CacheManager AND TERM(action=download) AND TERM(status=succeeded) AND download_set="*journal*"
+              | rex field=cache_id ".*\|(?&lt;customer_index&gt;.*)~.*~.*\|"
+              | eval identifier=(cache_id + host)
+              | stats count by identifier, customer_index
+              | stats count(eval(count&gt;1)) as duplicate_downloads, sum(count) as all_downloads count(eval(count&gt;=10)) as excessive_duplicate_downloads by customer_index
+              | eval duplicate_percent=if(all_downloads=0, 0, round((duplicate_downloads/all_downloads)*100, 2))
+              | sort  - duplicate_percent
+              | fields customer_index, duplicate_percent  all_downloads duplicate_downloads excessive_duplicate_downloads 
+              | rename customer_index as Index, duplicate_percent as "Repeat Download Percent",  all_downloads as "All Downloads", duplicate_downloads as "Repeated Downloads", excessive_duplicate_downloads as "Excessively Repeated Downloads"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">heatmap</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Remote Storage Overhead</title>
+      <chart>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$ source=*/splunkd_access.log
+              | rex field=uri "/services/admin/cacheman/bid|(?&lt;bid&gt;[^|]*)|/close"
+              | search uri=*/close*
+              | eval mytime=strftime(_time, "%Y-%m-%d %H:%M:%S")
+              | stats last(_time) as _time count as buckets, sum(miss_ms) as miss_ms sum(search_ms) as search_ms, min(mytime) as issuetime by sid
+              | fillnull value=0 search_ms
+              | eval overheadRatio=(miss_ms/search_ms)
+              | fillnull value=0 overheadRatio
+              | eval searchSpeed=case(overheadRatio &gt; 2,"More than 50%", overheadRatio &lt; .2, "Less than 10%", true(), "10%-50%")
+              | timechart count by searchSpeed</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>bad searches triggering bucket downloads from S3 storage</title>
+      <input type="multiselect" token="idx_searched" searchWhenChanged="true">
+        <label>indexes searched</label>
+        <delimiter> </delimiter>
+        <fieldForLabel>i</fieldForLabel>
+        <fieldForValue>i</fieldForValue>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$  sourcetype=splunkd source=*/splunkd.log
+ component=Cache* action=download download_set=*journal_gz* OR download_set=*tsidx*
+ earliest=$time.earliest$ latest=$time.latest$| rex "cache_id\=\"\w+\|(?&lt;i&gt;\S+)\~\d+\~" | dedup i | fields i</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+        </search>
+        <valueSuffix>,</valueSuffix>
+        <choice value="*">All</choice>
+        <default>*</default>
+      </input>
+      <table>
+        <search>
+          <query>(index=_audit 
+ (action=search info=granted OR info=completed OR info=canceled OR info=failed) search_id NOT typeahead NOT SummaryDirector NOT _ACCELERATE_DM* NOT rsa_scheduler*)
+    OR
+    (index=_introspection provenance) 
+| rename data.search_props.sid AS sid data.search_props.provenance AS provenance data.search_props.type AS search_type data.search_props.app AS app 
+```| rex max_match=200000 "search=\'(?&lt;thesearch&gt;(?:\n|.)*?)\'\, autojoin"```
+| rex max_match=1000 field=search "(?:[^\"\']|^)index=(?&lt;indexes&gt;[^\s\=\)\"]+)" 
+| rex max_match=1000 field=search "tag=(?&lt;tags&gt;[^\s+\||\)]+)" 
+| rex max_match=1000 field=search "eventtype=(?&lt;eventtypes&gt;[^\s+\||\)]+)" 
+| rex max_match=1000 field=search "(?&lt;macros&gt;\`[^\s]+\`)" 
+| eval secs=(search_lt-search_et) 
+| eval string_dur = tostring(round(secs), "duration") 
+| eval formatted_dur = replace(string_dur,"(?:(\d+)\+)?0?(\d+):0?(\d+):0?(\d+)","\1d \2h \3m \4s") 
+| eval result=replace(formatted_dur, "^d (0h (0m )?)?","") 
+| eval search_id=trim(search_id,"\'") 
+| eval search_id=coalesce(search_id,sid) 
+| eval origSid=search_id 
+| rex field=search_id ".*ubsearch_(?&lt;search_id&gt;.*)_\d+\.\d+" 
+| eval api_et=if(api_et="N/A", search_et, api_et) 
+| search NOT search_id="*tmp*" 
+| stats earliest(_time) AS _time sum(duration_command_search_*_bucketcache_miss) AS duration_*_bucketcache_miss sum(invocations_command_search_*_bucketcache_miss) AS invocations_*_bucketcache_miss values(result) AS total_historical_days_searched values(host) AS host values(user) AS user values(indexes) AS indexes values(macros) AS macros values(eventtypes) AS eventtypes values(tags) AS tags values(thesearch) AS search values(savedsearch_name) AS savedsearch_name max(total_run_time) AS run_time values(result_count) AS result_count values(event_count) AS event_count values(searched_buckets) AS searched_buckets values(info) AS status values(provenance) AS provenance values(app) AS app values(search_type) AS search_type dc(origSid) AS numofsearchesinquery by search_id 
+| fields _time status host duration_index_bucketcache_miss duration_rawdata_bucketcache_miss invocations_index_bucketcache_miss invocations_rawdata_bucketcache_miss total_historical_days_searched run_time user provenance app search_type savedsearch_name search indexes macros eventtypes tags result_count event_count searched_buckets numofsearchesinquery search_id 
+| fillnull value="All Time" total_historical_days_searched 
+| eval total_bad_metrics=duration_index_bucketcache_miss+duration_rawdata_bucketcache_miss+invocations_index_bucketcache_miss+invocations_rawdata_bucketcache_miss 
+| eval savedsearch_name=if(like(provenance,"%:Dashboard:%"),NULL,savedsearch_name) 
+| eval search_type=if(like(provenance,"%:Dashboard:%"),"ad-hoc dashboard",search_type) 
+| sort - total_bad_metrics 
+| where total_bad_metrics &gt; 1 | search indexes IN ($idx_searched$) | fillnull value="-"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="sid">$click.value2$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$sid$">
+      <title>audit.log for sid: $sid$</title>
+      <table>
+        <search>
+          <query>(index=_audit) sourcetype=audittrail action=search info=completed search_id="*$sid$*" | convert ctime(search_et) as et ctime(search_lt) as lt ctime(exec_time) as exec_time | table _time host user app provenance mode total_run_time search_id et lt exec_time search *miss</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>bucket download by index</title>
+      <chart>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$  sourcetype=splunkd source=*/splunkd.log
+ component=Cache* action=download download_set=*journal_gz* OR download_set=*tsidx* | rex "cache_id\=\"\w+\|(?&lt;i&gt;\S+)\~\d+\~"  | timechart $span$ dc(cache_id) by i limit=10 useother=f</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.overlayFields">instance_channel_threshold</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>timed out trying to localize files from remote storage by index</title>
+      <chart>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$ source=*/splunkd.log "waitFor, timed out trying to localize files from remote storage" | rex  "cache_id\=\"\w+\|(?&lt;i&gt;\S+)\~\d+\~" | timechart $span$  count by i limit=0</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Bucket localization failures by status code</title>
+      <chart>
+        <search>
+          <query>index=_internal  host IN $host_list$ host IN $host$   sourcetype=splunkd source=*/splunkd.log  component=S3Client log_level=ERROR | timechart partial=f count by statusCode</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
       </chart>
     </panel>
   </row>
@@ -743,6 +1158,162 @@ component=BucketReplicator replication queue for full | timechart count by peer 
   </row>
   <row>
     <panel>
+      <title>active searches (on indexers)</title>
+      <chart>
+        <search>
+          <query>| tstats
+max(PREFIX(active_searches=)) as active_searches
+where
+index::_internal
+host IN  ("idx1", "idx2", "idx3") host IN ("*") sourcetype::splunkd_remote_searches
+by host _time span=30s
+| timechart span=30s max(active_searches) by host limit=0 useother=f</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Data Ingest Balance</title>
+      <table>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=dmc_indexerclustergroup_idxc_label host IN ("*") sourcetype=splunkd source=*metrics.log name=index_thruput  | stats sum(kb) as kb by host | eval MB= round(kb/1024,0) | eval GB= round(kb/1024/1024,0) | table host MB GB | sort -GB</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>primaries balance by site</title>
+      <input type="dropdown" token="site" searchWhenChanged="true">
+        <label>site</label>
+        <fieldForLabel>site</fieldForLabel>
+        <fieldForValue>site</fieldForValue>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/cluster/master/peers | fields site | dedup site</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
+      <chart>
+        <title>$site$</title>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$  source=*metrics.log group=clustered_primaries_searches site=$site$    | timechart span=60s max(latest_num_primaries) by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>The primary_count_remote shows the number of primaries that the peer holds for non-local sites, including site0</title>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/cluster/master/peers | fields label, is_searchable, status, site, bucket_count,primary_count_remote host_port_pair, last_heartbeat, replication_port, base_generation_id, title, bucket_count_by_index.*
+            | eval is_searchable = if(is_searchable == 1 or is_searchable == "1", "Yes", "No")
+            | `dmc_time_format(last_heartbeat)`
+            | sort - last_heartbeat
+            | search label="***"
+            | search is_searchable="*"
+            | search status="*"
+            | search site="*"
+            | fields label, is_searchable, status, site, bucket_count,primary_count_remote
+            | rename label as Peer, is_searchable as "Fully Searchable", status as Status, site as Site, bucket_count as Buckets</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>smartstore components WARN/ERROR msgs (splunkd.log)</title>
       <table>
         <search>
@@ -761,7 +1332,7 @@ component=BucketReplicator replication queue for full | timechart count by peer 
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
         </search>
-        <option name="count">5</option>
+        <option name="count">3</option>
         <option name="dataOverlayMode">heatmap</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
@@ -770,313 +1341,6 @@ component=BucketReplicator replication queue for full | timechart count by peer 
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
       </table>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>cache manager upload rate (Kbps) by indexer</title>
-      <chart>
-        <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$ source=*metrics.log* group=cachemgr_upload kb |timechart $span$ partial=f limit=50 per_second(kb) as kbps by host</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
-    </panel>
-    <panel>
-      <title>cache manager download rate (KBps) by indexer</title>
-      <chart>
-        <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$ source=*metrics.log* group=cachemgr_download kb
-| timechart $span$ partial=f limit=50 per_second(kb) as kbps by host</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>Cache Hits/Misses</title>
-      <chart>
-        <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$ group=cachemgr_bucket source=*metrics.log | timechart $span$ count(cache_hit) as Hits count(cache_miss) as Misses</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>Cache Thrash by Index</title>
-      <table>
-        <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$ source=*splunkd.log* CacheManager AND TERM(action=download) AND TERM(status=succeeded) AND download_set="*journal*"
-              | rex field=cache_id ".*\|(?&lt;customer_index&gt;.*)~.*~.*\|"
-              | eval identifier=(cache_id + host)
-              | stats count by identifier, customer_index
-              | stats count(eval(count&gt;1)) as duplicate_downloads, sum(count) as all_downloads count(eval(count&gt;=10)) as excessive_duplicate_downloads by customer_index
-              | eval duplicate_percent=if(all_downloads=0, 0, round((duplicate_downloads/all_downloads)*100, 2))
-              | sort  - duplicate_percent
-              | fields customer_index, duplicate_percent  all_downloads duplicate_downloads excessive_duplicate_downloads 
-              | rename customer_index as Index, duplicate_percent as "Repeat Download Percent",  all_downloads as "All Downloads", duplicate_downloads as "Repeated Downloads", excessive_duplicate_downloads as "Excessively Repeated Downloads"</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="count">5</option>
-        <option name="dataOverlayMode">heatmap</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">true</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>buckets evicted</title>
-      <chart>
-        <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$ source=*metrics.log* group=spacemgr  evicted | timechart $span$ sum(evicted) as Evicted</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>Remote Storage Overhead</title>
-      <chart>
-        <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$ source=*/splunkd_access.log
-              | rex field=uri "/services/admin/cacheman/bid|(?&lt;bid&gt;[^|]*)|/close"
-              | search uri=*/close*
-              | eval mytime=strftime(_time, "%Y-%m-%d %H:%M:%S")
-              | stats last(_time) as _time count as buckets, sum(miss_ms) as miss_ms sum(search_ms) as search_ms, min(mytime) as issuetime by sid
-              | fillnull value=0 search_ms
-              | eval overheadRatio=(miss_ms/search_ms)
-              | fillnull value=0 overheadRatio
-              | eval searchSpeed=case(overheadRatio &gt; 2,"More than 50%", overheadRatio &lt; .2, "Less than 10%", true(), "10%-50%")
-              | timechart count by searchSpeed</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>timed out trying to localize files from remote storage by index</title>
-      <chart>
-        <search>
-          <query>index=_internal  host IN $host_list$ host IN $host$ source=*/splunkd.log "waitFor, timed out trying to localize files from remote storage" | rex  "cache_id\=\"\w+\|(?&lt;i&gt;\S+)\~\d+\~" | timechart $span$  count by i limit=0</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
     </panel>
   </row>
   <row>
