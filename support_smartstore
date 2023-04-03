@@ -1165,7 +1165,7 @@ component=BucketReplicator replication queue for full | timechart count by peer 
 max(PREFIX(active_searches=)) as active_searches
 where
 index::_internal
-host IN  $host$ sourcetype::splunkd_remote_searches
+host IN $host$ sourcetype::splunkd_remote_searches
 by host _time span=30s
 | timechart span=30s max(active_searches) by host limit=0 useother=f</query>
           <earliest>$time.earliest$</earliest>
