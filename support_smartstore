@@ -1165,7 +1165,7 @@ component=BucketReplicator replication queue for full | timechart count by peer 
 max(PREFIX(active_searches=)) as active_searches
 where
 index::_internal
-host IN  ("idx1", "idx2", "idx3") host IN ("*") sourcetype::splunkd_remote_searches
+host IN  $host$ sourcetype::splunkd_remote_searches
 by host _time span=30s
 | timechart span=30s max(active_searches) by host limit=0 useother=f</query>
           <earliest>$time.earliest$</earliest>
@@ -1212,7 +1212,7 @@ by host _time span=30s
       <title>Data Ingest Balance</title>
       <table>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=dmc_indexerclustergroup_idxc_label host IN ("*") sourcetype=splunkd source=*metrics.log name=index_thruput  | stats sum(kb) as kb by host | eval MB= round(kb/1024,0) | eval GB= round(kb/1024/1024,0) | table host MB GB | sort -GB</query>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN ("*") sourcetype=splunkd source=*metrics.log name=index_thruput  | stats sum(kb) as kb by host | eval MB= round(kb/1024,0) | eval GB= round(kb/1024/1024,0) | table host MB GB | sort -GB</query>
           <earliest>-24h@h</earliest>
           <latest>now</latest>
           <sampleRatio>1</sampleRatio>
