@@ -18,7 +18,7 @@
 max(PREFIX(peer_count=)) as peer_count
 where
 index=_internal
-host IN  ($captain_name$) sourcetype=splunkd source=*/metrics.log</query>
+host IN  ($captain_name$) sourcetype=splunkd source=*/metrics.log earliest=-10m</query>
     <done>
       <set token="peer_count">$result.peer_count$</set>
     </done>
