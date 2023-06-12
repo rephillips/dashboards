@@ -147,6 +147,27 @@
     </panel>
   </row>
   <row>
+    <panel>
+      <title>dbinspect corrupt buckets for index : $i$</title>
+      <table>
+        <search>
+          <query>| dbinspect index=$i$ corruptonly=true | search state!=hot</query>
+          <earliest>0</earliest>
+          <latest></latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
     <panel depends="$b$">
       <title>dbinspect for $b$</title>
       <html>
