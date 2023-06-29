@@ -489,7 +489,7 @@
       <title>scheduler status for datamodel: $dma$</title>
       <table>
         <search>
-          <query>index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler savedsearch_name IN (*$dma$*)  | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler    savedsearch_name IN (*$dma$*)  | table savedsearch_name ] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name  scheduled_time | sort +scheduled_time</query>
+          <query>index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler *ACCELERATE* savedsearch_name IN (*$dma$*)  | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=scheduler  *ACCELERATE*  savedsearch_name IN (*$dma$*)  | table savedsearch_name ] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name  scheduled_time | sort +scheduled_time</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -510,7 +510,7 @@
       <title>audit log events for datamodel: $dma$</title>
       <table>
         <search>
-          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$ source=*audittrail*  action=search  savedsearch_name IN (*$dma$*) search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id info | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count info| sort +exec_time| fillnull search_lt value="now"</query>
+          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=audittrail  action=search  *ACCELERATE* savedsearch_name IN (*$dma$*) search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id info | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count info| sort +exec_time| fillnull search_lt value="now"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -531,7 +531,7 @@
       <title>total_run_time for datamodel: $dma$</title>
       <chart>
         <search>
-          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$  source=*audittrail*  action=search  info=completed savedsearch_name IN (*$dma$*) search_id!=*rsa_*  |timechart span=5m max(total_run_time) by id usenull=f limit=0 | eval ceiling=300</query>
+          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$  source=*audittrail*  action=search  info=completed *ACCELERATE* savedsearch_name IN (*$dma$*) search_id!=*rsa_*  |timechart span=5m max(total_run_time) by id usenull=f limit=0 | eval ceiling=300</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
