@@ -322,9 +322,189 @@
         <option name="charting.legend.placement">right</option>
         <option name="height">389</option>
         <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="p">$click.name2$</set>
+        </drilldown>
       </chart>
       <html>
     <a data-unset-token="c1">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$p$">
+      <title>Maximum CPU  usage by Splunk process class</title>
+      <chart>
+        <title>$p$</title>
+        <search>
+          <query>index=_introspection sourcetype=splunk_resource_usage component=PerProcess host=$p$
+| eval process = 'data.process' 
+| eval args = 'data.args' 
+| eval pid = 'data.pid' 
+| eval ppid = 'data.ppid' 
+| eval elapsed = 'data.elapsed' 
+| eval mem_used = 'data.mem_used' 
+| eval mem = 'data.mem' 
+| eval pct_memory = 'data.pct_memory' 
+| eval normalized_pct_cpu = 'data.normalized_pct_cpu' 
+| eval pct_cpu = 'data.pct_cpu' 
+| eval sid = 'data.search_props.sid' 
+| eval app = 'data.search_props.app' 
+| eval label = 'data.search_props.label' 
+| eval type = 'data.search_props.type' 
+| eval mode = 'data.search_props.mode' 
+| eval user = 'data.search_props.user' 
+| eval role = 'data.search_props.role' 
+| eval label = if(isnotnull('data.search_props.label'), 'data.search_props.label', "") 
+| eval provenance = if(isnotnull('data.search_props.provenance'), 'data.search_props.provenance', "unknown") 
+| eval search_head = case(isnotnull('data.search_props.search_head') AND 'data.search_props.role' == "peer", 'data.search_props.search_head', isnull('data.search_props.search_head') AND 'data.search_props.role' == "head", "_self", isnull('data.search_props.search_head') AND 'data.search_props.role' == "peer", "_unknown") 
+| eval workload_pool = if(isnotnull('data.workload_pool'), 'data.workload_pool', "UNDEFINED") 
+| eval process_class = case( process=="splunk-optimize","index service", process=="sh" OR process=="ksh" OR process=="bash" OR like(process,"python%") OR process=="powershell","scripted input", process=="mongod", "KVStore") 
+| eval process_class = case( process=="splunkd" AND (like(args,"-p %start%") OR like(args,"service") OR like(args,"%_internal_launch_under_systemd%")),"splunkd server", process=="splunkd" AND isnotnull(sid),"search", process=="splunkd" AND (like(args,"fsck%") OR like(args,"recover-metadata%") OR like(args,"cluster_thing")),"index service", process=="splunkd" AND args=="instrument-resource-usage", "scripted input", (like(process,"python%") AND like(args,"%/appserver/mrsparkle/root.py%")) OR like(process,"splunkweb"),"Splunk Web", isnotnull(process_class), process_class) 
+| eval process_class = if(isnull(process_class),"other",process_class) 
+| bin _time span=10s 
+| eval process = 'data.process' 
+| eval args = 'data.args' 
+| eval pid = 'data.pid' 
+| eval ppid = 'data.ppid' 
+| eval elapsed = 'data.elapsed' 
+| eval mem_used = 'data.mem_used' 
+| eval mem = 'data.mem' 
+| eval pct_memory = 'data.pct_memory' 
+| eval normalized_pct_cpu = 'data.normalized_pct_cpu' 
+| eval pct_cpu = 'data.pct_cpu' 
+| eval sid = 'data.search_props.sid' 
+| eval app = 'data.search_props.app' 
+| eval label = 'data.search_props.label' 
+| eval type = 'data.search_props.type' 
+| eval mode = 'data.search_props.mode' 
+| eval user = 'data.search_props.user' 
+| eval role = 'data.search_props.role' 
+| eval label = if(isnotnull('data.search_props.label'), 'data.search_props.label', "") 
+| eval provenance = if(isnotnull('data.search_props.provenance'), 'data.search_props.provenance', "unknown") 
+| eval search_head = case(isnotnull('data.search_props.search_head') AND 'data.search_props.role' == "peer", 'data.search_props.search_head', isnull('data.search_props.search_head') AND 'data.search_props.role' == "head", "_self", isnull('data.search_props.search_head') AND 'data.search_props.role' == "peer", "_unknown") 
+| eval workload_pool = if(isnotnull('data.workload_pool'), 'data.workload_pool', "UNDEFINED") 
+| stats latest(pct_cpu) AS resource_usage_dedup latest(process_class) AS process_class by pid, _time 
+| stats sum(resource_usage_dedup) AS resource_usage by _time, process_class 
+| timechart span=1m Max(resource_usage) AS "Resource Usage" by process_class</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+      <html>
+    <a data-unset-token="p">Close this panel</a>
+  </html>
+    </panel>
+    <panel depends="$p$">
+      <title>Maximum CPU Resource Usage of Searches</title>
+      <chart>
+        <title>$p$</title>
+        <search>
+          <query>`dmc_set_index_introspection` host=$p$ sourcetype=splunk_resource_usage component=PerProcess data.search_props.sid::*
+        | `dmc_rename_introspection_fields`
+        | `dmc_set_bin`
+        | stats latest(pct_cpu) AS resource_usage_dedup by _time, type, sid, pid
+        | stats sum(resource_usage_dedup) AS sum_resource_usage by _time,  type
+        | eval sum_resource_usage = if("pct_cpu" == "pct_cpu", round(sum_resource_usage / 100.0, 2), sum_resource_usage)
+        | timechart $span$ Max(sum_resource_usage) AS "Max of resource usage" by type</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+      <html>
+    <a data-unset-token="p">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$p$">
+      <title>max cpu pct by sid , label</title>
+      <table>
+        <title>$p$</title>
+        <search>
+          <query>index=_introspection host=$p$ sourcetype=splunk_resource_usage component=PerProcess data.search_props.sid::* 
+| rename data.search_props.label as label| fillnull value="ad-hoc" label | stats max(data.pct_cpu) as data.pct_cpu by data.search_props.sid label  data.search_props.app data.search_props.provenance data.search_props.user  | sort -data.pct_cpu</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+      <html>
+    <a data-unset-token="p">Close this panel</a>
   </html>
     </panel>
   </row>
@@ -967,6 +1147,73 @@ where index::_introspection host=$f0$  sourcetype::splunk_resource_usage  by dat
           <sampleRatio>1</sampleRatio>
         </search>
         <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>sum(elapsedTime) spent on search by indexer</title>
+      <chart>
+        <title>Imbalance in elapsedTime suggests data ingest imbalance, primaries imbalance, or resource contention and searches will be slowed down by longest pole indexer</title>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$ source=*remote_searches.log* search_id=* | fields host search_id  elapsedTime  |stats  sum(elapsedTime) as elapsedTime by host | sort -elapsedTime</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>sum(elapsedTime) spent on search by indexer compared to sum scan_count and events_count</title>
+      <table>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$ source=*/remote_searches.log | fields host search_id scan_count events_count elapsedTime | search search_id=* scan_count=* elapsedTime=* |stats sum(scan_count) as scan_count sum(events_count) as events_count sum(elapsedTime) as elapsedTime by host | sort -elapsedTime</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
