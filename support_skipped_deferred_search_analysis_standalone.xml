@@ -1,0 +1,738 @@
+<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
+  <label>support_skipped_deferred_search_analysis_standalone</label>
+ 
+  <fieldset submitButton="false">
+    <input type="text" searchWhenChanged="true" token="host">
+      <label>Search Head</label>
+      <showClearButton>false</showClearButton>
+      
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>label</fieldForLabel>
+ 
+    </input>
+    <input type="dropdown" token="filter" searchWhenChanged="true">
+      <label>filter</label>
+      <choice value="=*">show all</choice>
+      <choice value="!=*ACCELERATE*">exclude accelerated searches</choice>
+      <choice value="=*ACCELERATE*">accelerated searches</choice>
+      <prefix>savedsearch_name</prefix>
+      <default>!=*ACCELERATE*</default>
+      <initialValue>!=*ACCELERATE*</initialValue>
+    </input>
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">1.) Are searches being skipped or deferred</span>  </b>
+
+        </h1>
+      </html>
+      <table>
+        <search>
+          <query>index=_internal source=*scheduler.log  
+$filter$ (status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) | chart  count sparkline(count, 1m) as trend by status  | sort -count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <!-- Set span for each sparkline datapoint to be 1 m -->
+        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"skipped":#ffb3b3,"delegated_remote_error":#ffb3b3,"completed":	#ccffcc,"deferred":#ffd966}</colorPalette>
+        </format>
+        <format field="trend" type="sparkline">
+          <option name="type">line</option>
+          <option name="lineColor">#ff9999</option>
+          <option name="height">30px</option>
+          <option name="fillColor">#ffe699</option>
+          <option name="colorMap">
+            <option name="2000:">#ff9999</option>
+          </option>
+        </format>
+        <drilldown>
+          <set token="s1">$click.value$</set>
+        </drilldown>
+      </table>
+      <html>
+        <p>Click on any row above to see timechart.</p>
+
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s1$">
+      <title>Log events reporting the following status: $s1$</title>
+      <chart>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  host=$host$ $filter$
+status="$s1$" | timechart span=1m count  by status usenull=f limit=0</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="s1a">$row.&lt;fieldname&gt;$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s1$">
+      <html>
+    <a data-unset-token="s1">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <input type="dropdown" token="reason" searchWhenChanged="true">
+        <label>reason</label>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <fieldForLabel>reason</fieldForLabel>
+        <fieldForValue>reason</fieldForValue>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  host=$host$
+(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) $filter$ | dedup reason | table reason</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">2.) Why are searches being skipped or deferred</span>  </b>
+
+        </h1>
+      </html>
+      <table>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  host=$host$
+(status=delegated_remote_error OR status=completed OR status=skipped OR status=deferred) $filter$ reason="$reason$" | chart count sparkline(count, 1m) as trend by  reason | sort -count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <!-- Set span for each sparkline datapoint to be 1 hour -->
+        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+        <format field="trend" type="sparkline">
+          <option name="type">line</option>
+          <option name="lineColor">#ff9999</option>
+          <option name="height">30px</option>
+          <option name="fillColor">#ffe699</option>
+          <option name="colorMap">
+            <option name="2000:">#ff9999</option>
+          </option>
+        </format>
+        <drilldown>
+          <set token="s2">$click.value$</set>
+        </drilldown>
+      </table>
+      <html>
+        <p>Click reason above to see timechart.</p>
+
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s2$">
+      <html>
+    <a data-unset-token="s2">Close this panel</a>
+  </html>
+      <chart>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  host=$host$
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error  $filter$ reason="$s2$" | timechart limit=0 count  by reason usenull=f</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">minmax</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="r1">$click.name2$</set>
+        </drilldown>
+      </chart>
+      <html>
+       <p>Click reason to see more details.</p>
+
+      </html>
+    </panel>
+    <panel depends="$r1$">
+      <html>
+    <a data-unset-token="r1">Close this panel</a>
+
+
+
+      </html>
+      <chart>
+        <title>$r1$</title>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  host=$host$
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ reason="$r1$" | timechart count  by savedsearch_name limit=0 usenull=f</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="r2">$click.name2$</set>
+        </drilldown>
+      </chart>
+      <html>
+        <p>Click search name to see more details.</p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$r2$">
+      <html>
+    <a data-unset-token="r2">Close this panel</a>
+  </html>
+      <table>
+        <title>runtime vs cron schedule (how long does it take to run this search vs how often are we running it) SEARCH: $r2$</title>
+        <search>
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$host$ | where is_scheduled=1 | search disabled=0  | stats count by  title  next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| fields title next_scheduled_time cron_schedule schedule_priority schedule_window dispatch.earliest_time dispatch.latest_time| rename title as savedsearch_name | search savedsearch_name="$r2$" | join savedsearch_name [search index=_internal  source=*scheduler.log* search_group=dmc_group_search_head search_group="$group$" status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error reason=* savedsearch_name="$r2$"] | join savedsearch_name [search index=_internal search_group=dmc_group_search_head search_group="$group$" sourcetype=scheduler  status=*  savedsearch_name="$r2$" dispatch_time=*
+| eval runtime_delay= (dispatch_time-scheduled_time) | stats avg(runtime_delay) as avg_runtime_delay max(runtime_delay) as max_runtime_delay avg(run_time) as avg_runtime max(run_time) as max_runtime by savedsearch_name | eval avg_runtime_delay=round(avg_runtime_delay,0) | eval max_runtime_delay=round(max_runtime_delay,0)| eval avg_runtime=round(avg_runtime,0) | eval max_runtime=round(max_runtime,0)| rename avg_runtime_delay as "avg_delay(sec)" max_runtime_delay as "max_delay(sec)" avg_runtime as avg_runtime(sec) max_runtime as max_runtime(sec) | sort - "max_runtime(sec)"] | table savedsearch_name status reason avg_runtime(sec) max_runtime(sec) "avg_delay(sec)" "max_delay(sec)" cron_schedule | sort -max_runtime(sec)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="cron">$click.value6$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <input type="multiselect" token="ss_name" searchWhenChanged="true">
+        <label>savedsearch_name</label>
+        <choice value="*">all</choice>
+        <prefix>savedsearch_name=</prefix>
+        <delimiter> OR savedsearch_name=</delimiter>
+        <fieldForLabel>savedsearch_name</fieldForLabel>
+        <fieldForValue>savedsearch_name</fieldForValue>
+        <search>
+          <query>`dmc_set_index_internal` earliest=$time.earliest$ latest=$time.latest$ source=*scheduler.log  host=$host$
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ | dedup savedsearch_name | table savedsearch_name</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <default>*</default>
+        <initialValue>*</initialValue>
+      </input>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">3.) Which searches are being skipped or deferred</span>  </b>
+
+        </h1>
+      </html>
+      <table>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  host=$host$
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ $ss_name$ | chart count sparkline(count, 1m) as trend by savedsearch_name  | sort -count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <!-- Set span for each sparkline datapoint to be 1 hour -->
+        <!-- Set sparkline options here; make sure that field matches field name of the search results -->
+        <option name="count">3</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+        <format field="trend" type="sparkline">
+          <option name="type">line</option>
+          <option name="lineColor">#ff9999</option>
+          <option name="height">30px</option>
+          <option name="fillColor">#ffe699</option>
+          <option name="colorMap">
+            <option name="2000:">#ff9999</option>
+          </option>
+        </format>
+        <drilldown>
+          <set token="s3">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s3$">
+      <chart>
+        <title>reasons $s3$ has been skipped or deferred</title>
+        <search>
+          <query>`dmc_set_index_internal` source=*scheduler.log  host=$host$
+status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error savedsearch_name="$s3$" $filter$ | timechart count  by reason limit=0 usenull=f</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s3$">
+      <chart>
+        <title>$s3$ has been skipped or deferred for the following scheduled times</title>
+        <search>
+          <query>index=_internal host=$host$ source=*scheduler.log*  $filter$ savedsearch_name="$s3$"   | eval delay=(dispatch_time-scheduled_time) | join savedsearch_name  [search index=_internal host=$host$ source=*scheduler.log*   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ savedsearch_name="$s3$"  | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed | search status!=success | search status!=delegated_remote | search status!=delegated_remote_completion | eval _time=scheduled_time | timechart span=1m count by status limit=0 usenull=f</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">scheduled_time</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s3$">
+      <title>$s3$ has been  skipped or deferred past its scheduled_time for the scheduled times listed below.</title>
+      <table>
+        <title>$s3$</title>
+        <search>
+          <query>index=_internal host=$host$ source=*scheduler.log*  $filter$ savedsearch_name="$s3$"   | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal host=$host$ source=*scheduler.log*   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ savedsearch_name="$s3$"  | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed | search status!=success | search status!="delegated_remote" | search status!="delegated_remote_completion"  | stats list(scheduled_time) as scheduled_time by  savedsearch_name status  | eval scheduler_action = case(status == "skipped", "scheduler will not attempt to re-run these searches for the scheduled_time",status == "delayed", "scheduler will retry to run the search up until the next scheduled_time",status == "deferred", "scheduler will attempt to re-run these searches for their scheduled_time at a future point in time",status == "delegated_remote_error", "scheduler will retry once to delgate, if still fails no further attempt") | table savedsearch_name status scheduler_action scheduled_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel depends="$s3$">
+      <title>status by scheduled_time for the last $time.earliest$</title>
+      <table>
+        <title>$s3$</title>
+        <search>
+          <query>index=_internal host=$host$ source=*scheduler.log* $filter$ savedsearch_name="$s3$" | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal host=$host$ source=*scheduler.log*   status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error $filter$ savedsearch_name="$s3$" | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time | sort +scheduled_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s3$">
+      <title>audit log for completed run times for $s3$</title>
+      <table>
+        <search>
+          <query>index=_audit host=$host$ source=*audittrail*  action=search info=completed $filter$ savedsearch_name="$s3$" search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count | sort +exec_time| fillnull search_lt value="now"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s3$">
+      <title>Latency for completed run times for : $s3$</title>
+      <table>
+        <title>Latency is the difference between scheduled and dispatch time</title>
+        <search>
+          <query>`dmc_set_index_internal` host=$host$ sourcetype=scheduler status="completed" $filter$ savedsearch_name="$s3$"
+            | eval window_time = if(isnotnull(window_time), window_time, 0)
+            | eval execution_latency = max(dispatch_time - (scheduled_time + window_time), 0)
+            | stats max(execution_latency) as "latency seconds"  by scheduled_time dispatch_time | convert ctime(scheduled_time) as scheduled_time ctime(dispatch_time) as dispatch_time</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s3$">
+      <title>Latency timechart for $s3$</title>
+      <chart>
+        <search>
+          <query>`dmc_set_index_internal` host=$host$ sourcetype=scheduler status="completed" $filter$ savedsearch_name="$s3$"
+            | eval window_time = if(isnotnull(window_time), window_time, 0)
+            | eval execution_latency = max(dispatch_time - (scheduled_time + window_time), 0) | eval _time=scheduled_time
+            | timechart span=1m max(execution_latency) as "latency seconds"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">scheduled_time</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+      <html>
+    <a data-unset-token="s3">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <h1>
+          <b>
+            <span style="color: #ED179F">4.) Overall Impact of unique searches</span>  </b>
+
+        </h1>
+      </html>
+      <table>
+        <search>
+          <query>index=_internal host=$host$ source=*scheduler.log*  $filter$ savedsearch_name=*  | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal host=$host$ source=*scheduler.log* $filter$  status=skipped OR status=continued OR status=deferred OR status=delegated_remote_error savedsearch_name=*  | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion    | stats dc(savedsearch_name) as "unique searches impacted" by status | sort -"unique searches impacted"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"skipped":#ffb3b3,"delegated_remote_error":#ffb3b3,"completed":	#ccffcc,"deferred":#ffd966}</colorPalette>
+        </format>
+        <drilldown>
+          <set token="s4">$click.value$</set>
+        </drilldown>
+      </table>
+      <html>
+        <p>Click on status to see impacted searches and for which scheduled_time</p>
+
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s4$">
+      <title>Scheduled searches that have been $s4$ for their scheduled time listed below.</title>
+      <html>
+        <a data-unset-token="s4">Close this panel</a>
+  </html>
+      <table>
+        <search>
+          <query>index=_internal host=$host$ source=*scheduler.log*  savedsearch_name=* $filter$   | eval delay=(dispatch_time-scheduled_time)  | convert ctime(scheduled_time) as scheduled_time | convert ctime(dispatch_time) as dispatch_time | join savedsearch_name  [search index=_internal host=$host$ source=*scheduler.log*   status="$s4$" savedsearch_name=* $filter$ | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion   | stats list(scheduled_time) by savedsearch_name status | rename list(scheduled_time) as "scheduled time for which search was $s4$"| eval scheduler_action = case(status == "skipped", "scheduler will not attempt to re-run these searches for the scheduled_time",status == "delayed", "scheduler will retry to run the search up until the next scheduled_time",status == "deferred", "scheduler will attempt to re-run these searches for their scheduled_time at a future point in time",status == "delegated_remote_error", "scheduler will retry once to delgate, if still fails no further attempt") | table savedsearch_name status scheduler_action "scheduled time for which search was $s4$" | search status="$s4$"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="s6">$click.value$</set>
+        </drilldown>
+      </table>
+      <html>
+        <p>Click savedsearch name above to see timechart.</p>
+
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$s6$">
+      <title>$s6$  was $s4$ for the following scheduled_times</title>
+      <chart>
+        <title>searches which did not complete for a given scheduled_time</title>
+        <search>
+          <query>index=_internal host=$host$ source=*scheduler.log*  $filter$  status="$s4$"   | join savedsearch_name  [search index=_internal host=$host$ source=*scheduler.log*   $filter$ status="$s4$"    | dedup savedsearch_name | table savedsearch_name] | stats count by savedsearch_name scheduled_time status | stats list(status) as status list(count) as count by savedsearch_name scheduled_time  | sort +scheduled_time | search status!=completed |search status!=success |search status!=delegated_remote |search status!=delegated_remote_completion |search savedsearch_name="$s6$" | eval _time=scheduled_time | timechart  count by status limit=0 usenull=f</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">scheduled_time</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">1</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+      <html>
+        <a data-unset-token="s6">Close this panel</a>
+  </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+                 <style>.btn-primary { margin: 5px 10px 5px 0; }</style>
+                 <a target="_blank" href="support_shc_scheduler_analysis_detailed" class="btn btn-primary">continue investigation by looking at SHC status and configurations </a>
+             </html>
+    </panel>
+  </row>
+</form>
