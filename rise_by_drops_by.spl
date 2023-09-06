@@ -1,0 +1,1 @@
+index=_audit sourcetype=audittrail action=search info=completed subsearch_AlertActionsRequredFields | rex field=search "savedsearch\=\"(?<user>\S+)\;(?<app>\S+)\;(?<savedsearch_name>.+)\"" | table _time host total_run_time  search user app savedsearch_name | sort -total_run_time
