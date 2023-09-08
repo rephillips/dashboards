@@ -1,4 +1,4 @@
-<form version="1.1" hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js">
+<form version="1.1" hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js" theme="light">
   <!-- Author: Rob Phillips, rphillips@splunk.com -->
   <label>support_shc_template_datamodel</label>
   <search>
@@ -72,7 +72,6 @@
         <latest>now</latest>
       </search>
       <delimiter>, </delimiter>
-      <default>*</default>
     </input>
     <input type="time" searchWhenChanged="true" token="time">
       <label>Time Range:</label>
@@ -118,74 +117,6 @@
       </change>
     </input>
   </fieldset>
-  <row>
-    <panel>
-      <title>shc captaincy timeline</title>
-      <chart>
-        <search>
-          <query>index=_internal search_group="dmc_group_search_head" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd group=searchscheduler search_group=dmc_group_search_head search_group=*
-| eval state=if(delegated&gt;0, "captain", "non-captain")
-| search state="captain"
-| timechart  $span$ distinct_count(state) by host</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
-        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
-        <option name="charting.axisTitleX.visibility">visible</option>
-        <option name="charting.axisTitleY.visibility">visible</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
-        <option name="charting.axisX.abbreviation">none</option>
-        <option name="charting.axisX.scale">linear</option>
-        <option name="charting.axisY.abbreviation">none</option>
-        <option name="charting.axisY.scale">linear</option>
-        <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
-        <option name="charting.chart">line</option>
-        <option name="charting.chart.bubbleMaximumSize">50</option>
-        <option name="charting.chart.bubbleMinimumSize">10</option>
-        <option name="charting.chart.bubbleSizeBy">area</option>
-        <option name="charting.chart.nullValueMode">gaps</option>
-        <option name="charting.chart.showDataLabels">none</option>
-        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
-        <option name="charting.chart.stackMode">default</option>
-        <option name="charting.chart.style">shiny</option>
-        <option name="charting.drilldown">none</option>
-        <option name="charting.layout.splitSeries">0</option>
-        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
-        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
-        <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">right</option>
-        <option name="charting.lineWidth">2</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="trellis.enabled">0</option>
-        <option name="trellis.scales.shared">1</option>
-        <option name="trellis.size">medium</option>
-      </chart>
-    </panel>
-  </row>
-  <row>
-    <panel>
-      <title>accelerated datamodels</title>
-      <table>
-        <search>
-          <query>| rest splunk_server=$captain_name$ /services/datamodel/acceleration | search acceleration=1 | search title IN($dma$) | table title acceleration.cron_schedule acceleration.backfill_time acceleration.earliest_time acceleration.max_concurrent acceleration.max_time search</query>
-          <earliest>$time.earliest$</earliest>
-          <latest>$time.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="count">100</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
-        <option name="rowNumbers">false</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-      </table>
-    </panel>
-  </row>
   <row>
     <panel depends="$checked_config$">
       <table>
@@ -419,6 +350,75 @@
   </row>
   <row>
     <panel>
+      <title>shc captaincy timeline</title>
+      <chart>
+        <search>
+          <query>index=_internal search_group="dmc_group_search_head" search_group=$dmc_group$ host IN $host$  sourcetype=splunkd group=searchscheduler search_group=dmc_group_search_head search_group=*
+| eval state=if(delegated&gt;0, "captain", "non-captain")
+| search state="captain"
+| timechart  $span$ distinct_count(state) by host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>accelerated datamodels</title>
+      <table>
+        <search>
+          <query>| rest splunk_server=$captain_name$ /services/datamodel/acceleration | search acceleration=1 | search title IN($dma$) | table title acceleration.cron_schedule acceleration.backfill_time acceleration.earliest_time acceleration.max_concurrent acceleration.max_time  dataset.type eai:acl.app eai:acl.owner search  | rename acceleration.cron_schedule as acceleration_cron_schedule acceleration.earliest_time as acceleration_et acceleration.max_time as acceleration_max_time dataset.type as dataset_type eai:acl.app as app eai:acl.owner as owner</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <title>datamodel completion %</title>
       <table>
         <search>
@@ -570,6 +570,55 @@
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Datamodel elasped time by indexer for sid: $dma_sid$</title>
+      <input type="dropdown" token="dma_sid" searchWhenChanged="true">
+        <label>latest DMA sid</label>
+        <fieldForLabel>search_id</fieldForLabel>
+        <fieldForValue>search_id</fieldForValue>
+        <search>
+          <query>index=_audit sourcetype=audittrail action=search info=completed search_type=datamodel_acceleration provenance=scheduler savedsearch_name=_ACCELERATE_DM* *$dma$* | stats latest(search_id) as search_id</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
+      <chart>
+        <title>look for imbalance in elapsed time and focus on indexers where DMA is running the longest</title>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer"  source=*/remote_searches.log search_id="*$dma_sid$*" | fields host search_id  elapsedTime  |stats  sum(elapsedTime) as elapsedTime by host | sort -elapsedTime</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Datamodel elasped time, scan_count, events_count by indexer for sid: $dma_sid$</title>
+      <table>
+        <title>for indexers with the largest elapsedTime, do they also have the most events_count? If so, likely an ingestion data distribution problem where data is not evenly spread across all indexers</title>
+        <search>
+          <query>index=_internal search_group="dmc_group_indexer"  host IN ("*") source=*/remote_searches.log | fields host search_id scan_count events_count elapsedTime | search search_id="*$dma_sid$*" scan_count=* elapsedTime=* |stats sum(scan_count) as scan_count sum(events_count) as events_count sum(elapsedTime) as elapsedTime by host | sort -elapsedTime</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
 </form>
