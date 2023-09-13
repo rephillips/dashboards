@@ -1,5 +1,5 @@
 <form version="1.1" hideEdit="False" script="common_control.js, drilldown_action_extension.js, kv_store_deployment_extension.js">
-  <label>support_kvstore</label>
+  <label>support_kvstore_shc</label>
   <fieldset autoRun="true" submitButton="false">
     <input type="dropdown" searchWhenChanged="true" token="group">
       <label>Group</label>
