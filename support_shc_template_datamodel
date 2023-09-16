@@ -494,8 +494,9 @@
   </row>
   <row>
     <panel>
+      <title>Datamodels and Eventtypes</title>
       <table>
-        <title>Datamodels and Eventtypes - Ideally, Eventtypes Should Include an Index Definition if Possible</title>
+        <title>Ideally, Eventtypes Should Include an Index Definition if Possible</title>
         <search>
           <query>| rest /services/datamodel/model splunk_server=$captain_name$
 | search acceleration="*enabled*:true*" 
@@ -553,10 +554,10 @@
   </row>
   <row>
     <panel>
-      <title>audit log events for datamodel: $dma$</title>
+      <title>audit log events for  datamodel: $dma$</title>
       <table>
         <search>
-          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=audittrail  action=search  *ACCELERATE* savedsearch_name IN (*$dma$*) search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id info | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count info| sort +exec_time| fillnull search_lt value="now"</query>
+          <query>index=_audit search_group=dmc_group_search_head search_group=$dmc_group$ sourcetype=audittrail  action=search   *ACCELERATE* savedsearch_name IN (*$dma$*) search_id!=*rsa_* | convert ctime(exec_time) as exec_time ctime(api_et) as api_et ctime(api_lt) as api_lt ctime(search_et) as search_et ctime(search_lt) as search_lt | dedup savedsearch_name search_id info | table host savedsearch_name search_id total_run_time exec_time  search_et  search_lt  result_count info| sort +exec_time| fillnull search_lt value="now"</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -622,7 +623,7 @@
   </row>
   <row>
     <panel>
-      <title>Datamodel elasped time by indexer for sid: $dma_sid$</title>
+      <title>Datamodel $dma$ elasped time by indexer for sid: $dma_sid$ - select one datamodel from above to analyze</title>
       <input type="dropdown" token="dma_sid" searchWhenChanged="true">
         <label>latest DMA sid</label>
         <fieldForLabel>search_id</fieldForLabel>
@@ -636,7 +637,7 @@
       <chart>
         <title>look for imbalance in elapsed time and focus on indexers where DMA is running the longest</title>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer"  source=*/remote_searches.log search_id="*$dma_sid$*" | fields host search_id  elapsedTime  |stats  sum(elapsedTime) as elapsedTime by host | sort -elapsedTime</query>
+          <query>index=_internal search_group="dmc_group_indexer"  source=*/remote_searches.log search_id="*$dma_sid$*" | fields host search_id  elapsedTime  |stats  sum(elapsedTime) as elapsedTime(sec) by host | sort -elapsedTime(sec)</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
