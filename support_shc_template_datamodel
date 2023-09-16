@@ -211,7 +211,7 @@
       <title>Memory used by datamodel accelerations</title>
       <chart>
         <search>
-          <query>index=_introspection search_group="dmc_group_indexer"  sourcetype=splunk_resource_usage (component=PerProcess "data.search_props.type"="datamodel acceleration")  | rex "_ACCELERATE_DM_\w([^_]+)\_(?&lt;datamodel_acceleration&gt;\S+)_ACCELERATE_"  | timechart $span$ sum(data.mem_used) by datamodel_acceleration  usenull=f limit=0</query>
+          <query>index=_introspection search_group="dmc_group_indexer"  sourcetype=splunk_resource_usage (component=PerProcess "data.search_props.type"="datamodel acceleration")  | rex "_ACCELERATE_DM_\w([^_]+)\_(?&lt;datamodel_acceleration&gt;\S+)_ACCELERATE_" | search datamodel_acceleration=$dma$ | timechart $span$ sum(data.mem_used) by datamodel_acceleration  usenull=f limit=0</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
