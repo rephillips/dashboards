@@ -111,7 +111,7 @@
   </fieldset>
   <row>
     <panel depends="$checked_config$">
-      <title>CM server.conf</title>
+      <title>cluster manager settings</title>
       <table>
         <search>
           <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/cluster_label | table splunk_server value
@@ -122,6 +122,9 @@
     [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/multisite | table splunk_server value
     | rename value as multisite] 
 
+| join splunk_server 
+    [| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/properties/server/clustering/summary_replication | table splunk_server value
+    | rename value as summary_replication] 
 
 
 | join splunk_server 
@@ -166,7 +169,7 @@
 | eval stanza="clustering" 
 | eval conf="server.conf"
 
- | table splunk_server cluster_label conf stanza multisite heartbeat_timeout replication_factor search_factor available_sites site_* service_interval</query>
+ | table splunk_server cluster_label conf stanza summary_replication multisite heartbeat_timeout replication_factor search_factor available_sites site_* service_interval</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -175,6 +178,7 @@
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -1078,6 +1082,7 @@ where index::_introspection host=$f0$  sourcetype::splunk_resource_usage  by dat
         <option name="dataOverlayMode">none</option>
         <option name="drilldown">none</option>
         <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
@@ -1086,10 +1091,29 @@ where index::_introspection host=$f0$  sourcetype::splunk_resource_usage  by dat
   </row>
   <row>
     <panel>
-      <title>site0 primaries balance</title>
+      <title>primary balance by site</title>
+      <input type="dropdown" token="site" searchWhenChanged="true">
+        <label>site</label>
+        <fieldForLabel>Site</fieldForLabel>
+        <fieldForValue>Site</fieldForValue>
+        <search>
+          <query>| rest splunk_server_group=dmc_group_cluster_master splunk_server_group=$dmc_group$ /services/cluster/master/peers | fields label, is_searchable, status, site, bucket_count,primary_count_remote host_port_pair, last_heartbeat, replication_port, base_generation_id, title, bucket_count_by_index.*
+            | eval is_searchable = if(is_searchable == 1 or is_searchable == "1", "Yes", "No")
+            | `dmc_time_format(last_heartbeat)`
+            | sort - last_heartbeat
+            | search label="***"
+            | search is_searchable="*"
+            | search status="*"
+            | search site="*"
+            | fields label, is_searchable, status, site, bucket_count,primary_count_remote
+            | rename label as Peer, is_searchable as "Fully Searchable", status as Status, site as Site, bucket_count as Buckets | fields Site | dedup Site | table Site</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+      </input>
       <chart>
         <search>
-          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$ source=*metrics.log group=clustered_primaries_searches site=site0    | timechart $span$ max(latest_num_primaries) by host</query>
+          <query>index=_internal search_group="dmc_group_indexer" search_group=$dmc_group$ host IN $host$ source=*metrics.log group=clustered_primaries_searches  site=$site$   | timechart $span$ max(latest_num_primaries) by host</query>
           <earliest>$time.earliest$</earliest>
           <latest>$time.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -1394,6 +1418,53 @@ max(to_fix_total) as to_fix_total</query>
         <option name="trellis.scales.shared">1</option>
         <option name="trellis.size">medium</option>
       </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>search heads which spawned datamodel accelerations</title>
+      <table>
+        <title>confirm that no more than 1 SH deployment is dispatching the same datamodel acceleration to the index cluster selected.</title>
+        <search>
+          <query>index=_introspection search_group="dmc_group_indexer" search_group=$dmc_group$   sourcetype=splunk_resource_usage source=*resource_usage.log "data.search_props.provenance"=scheduler "data.search_props.type"="datamodel acceleration" | rex "_ACCELERATE_DM_\w([^_]+)\_(?&lt;datamodel_acceleration&gt;\S+)_ACCELERATE_"| stats values(data.search_props.search_head) as "dispatching search head" by datamodel_acceleration</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+      <html>
+        <a href="https://docs.splunk.com/Documentation/Splunk/latest/Knowledge/Sharedatamodelsummaries" target="_blank">Learn More</a>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>max run time by datamodel</title>
+      <table>
+        <title>datamodels which take longer than 300s should be looked into. datamodels which take over 3000s seconds will get terminated at 3600s and should be inspected. Set summary_replication=true on cluster manager server.conf [clustering] stanza  if smartstore is not used.</title>
+        <search>
+          <query>index=_introspection search_group="dmc_group_indexer" search_group=$dmc_group$   sourcetype=splunk_resource_usage source=*resource_usage.log "data.search_props.provenance"=scheduler "data.search_props.type"="datamodel acceleration" | rex "_ACCELERATE_DM_\w([^_]+)\_(?&lt;datamodel_acceleration&gt;\S+)_ACCELERATE_"| stats max(data.elapsed) as "max datamodel runtime" by datamodel_acceleration</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
     </panel>
   </row>
 </form>
