@@ -1,0 +1,137 @@
+<form version="1.1" hideEdit="False" script="common_control.js, drilldown_action_extension.js, resource_usage_deployment_extension.js" theme="light">
+  <!-- Author: Rob Phillips, rphillips@splunk.com -->
+  <label>support_idxc_log_export</label>
+  <search>
+    <query>|rest splunk_server_group=dmc_group_search_head splunk_server_group="$dmc_group$"  /services/shcluster/status|head 1|fields captain.label|rename captain.label AS captain_label</query>
+    <done>
+      <set token="captain_name">$result.captain_label$</set>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="dropdown" searchWhenChanged="true" token="dmc_group">
+      <label>Group</label>
+      <showClearButton>false</showClearButton>
+      <search>
+        <query>| `dmc_get_groups_containing_role(dmc_group_indexer)`
+          | search search_group!="dmc_group_*"</query>
+      </search>
+      <fieldForLabel>label</fieldForLabel>
+      <fieldForValue>search_group</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+    </input>
+    <input type="multiselect" searchWhenChanged="true" token="host">
+      <label>Instance</label>
+      <search>
+        <query>| inputlookup dmc_assets 
+| mvcombine search_group 
+| search search_group=$dmc_group$
+| where (search_group == "dmc_group_indexer") | table host</query>
+      </search>
+      <delimiter>, </delimiter>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <prefix>(</prefix>
+      <suffix>)</suffix>
+      <choice value="*">All</choice>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+    </input>
+    <input type="time" searchWhenChanged="true" token="time">
+      <label>Time Range:</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="span" searchWhenChanged="true">
+      <label>span</label>
+      <choice value="30s">30s</choice>
+      <choice value="60s">1m</choice>
+      <choice value="5m">5m</choice>
+      <choice value="15m">15m</choice>
+      <choice value="1h">1h</choice>
+      <prefix>span=</prefix>
+      <default>60s</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>splunkd.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd source=*/splunkd.log   search_group="$dmc_group$"  host IN $host$ | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>metrics.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd source=*/metrics.log  search_group="$dmc_group$"  host IN $host$  | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>splunkd_access.log</title>
+      <table>
+        <search>
+          <query>index=_internal sourcetype=splunkd_access source=*/splunkd_access.log search_group="$dmc_group$"  host IN $host$ | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>resource_usage.log</title>
+      <table>
+        <search>
+          <query>index=_introspection sourcetype=splunk_resource_usage source=*/resource_usage.log search_group="$dmc_group$"  host IN $host$ | table host source _raw</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">1</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
