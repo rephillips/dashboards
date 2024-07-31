@@ -1,4 +1,4 @@
-<form hideEdit="False" isVisible="true" onUnloadCancelJobs="true" stylesheet="indexing_performance_instance_extension.css" script="common_control.js">
+<form version="1.1" hideEdit="False" isVisible="true" onUnloadCancelJobs="true" stylesheet="indexing_performance_instance_extension.css" script="common_control.js">
   <label>support_indexing_performance</label>
   <search id="internal_metrics_log_base">
     <query>
