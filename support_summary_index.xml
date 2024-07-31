@@ -1,4 +1,4 @@
-<form hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
+<form version="1.1" hideEdit="false" script="common_control.js, table_cell_highlighting.js, table_cell_highlighting1.js" stylesheet="shared.css, health-check.css, table_cell_highlighting.css" theme="light">
   <label>support_summary_index</label>
   <description>description: This dashboard view was built to help highlight searches which either read from or write to summary indexes. Install this view on the Monitoring Console in the splunk_monitoring_console app</description>
   <search>
