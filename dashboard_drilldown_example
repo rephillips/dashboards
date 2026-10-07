@@ -1,0 +1,383 @@
+<form version="1.1" theme="light">
+  <label>Splunk Internal Logs - Classic Drilldown Examples</label>
+  <description>Internal splunkd logs with click-to-expand drilldowns.</description>
+  <!-- INSTALL: Paste this source into a Classic dashboard. Requires _internal access.
+       Detail panels start hidden. An overview click opens both; each panel has
+       its own Hide text link. There is no separate control or explanation panel. -->
+  <search id="overview_counts">
+    <query>index=_internal sourcetype=splunkd host=$host_filter|s$
+| stats count AS Total count(eval(log_level="ERROR")) AS Errors count(eval(log_level="WARN")) AS Warnings</query>
+    <earliest>$global_time.earliest$</earliest>
+    <latest>$global_time.latest$</latest>
+  </search>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="global_time" searchWhenChanged="true">
+      <label>Overview time range</label>
+      <default>
+        <earliest>-60m</earliest>
+        <latest>now</latest>
+      </default>
+      <!-- Clear ALL detail tokens so hidden searches also stop dispatching. -->
+      <change>
+        <unset token="form.hide_chart" />
+        <unset token="hide_chart" />
+        <unset token="form.hide_table" />
+        <unset token="hide_table" />
+        <unset token="show_detail" />
+        <unset token="show_detail_chart" />
+        <unset token="show_detail_table" />
+        <unset token="dd_host" />
+        <unset token="dd_level" />
+        <unset token="dd_component" />
+        <unset token="dd_earliest" />
+        <unset token="dd_latest" />
+        <unset token="detail_query" />
+      </change>
+    </input>
+    <input type="text" token="host_filter" searchWhenChanged="true">
+      <label>Host or wildcard (for example idx-*)</label>
+      <default>*</default>
+      <change>
+        <unset token="form.hide_chart" />
+        <unset token="hide_chart" />
+        <unset token="form.hide_table" />
+        <unset token="hide_table" />
+        <unset token="show_detail" />
+        <unset token="show_detail_chart" />
+        <unset token="show_detail_table" />
+        <unset token="dd_host" />
+        <unset token="dd_level" />
+        <unset token="dd_component" />
+        <unset token="dd_earliest" />
+        <unset token="dd_latest" />
+        <unset token="detail_query" />
+      </change>
+    </input>
+  </fieldset>
+  <!-- EXAMPLE 1: Singles share a small, transforming base search. -->
+  <row>
+    <panel>
+      <html id="hide_control_styles">
+        <style>
+          #hide_control_styles { display: none; }
+          #hide_chart_control label, #hide_table_control label { display: none !important; }
+          #hide_chart_control, #hide_table_control { margin: 0; min-height: 0; }
+          #detail_chart_panel .fieldset, #detail_table_panel .fieldset { margin-bottom: 0 !important; padding-bottom: 0 !important; border-bottom: 0 !important; }
+          #hide_chart_control button, #hide_table_control button {
+            background: transparent !important; border: 0 !important; box-shadow: none !important;
+            padding: 0 !important; color: #006d9c !important; text-decoration: underline;
+            min-height: 24px; cursor: pointer;
+          }
+        </style>
+      </html>
+      <single>
+        <title>All log events</title>
+        <search base="overview_counts">
+          <query>fields Total</query>
+        </search>
+        <option name="field">Total</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="useThousandSeparators">true</option>
+        <option name="underLabel">Click to show matching events below</option>
+        <drilldown>
+          <set token="dd_host">$host_filter$</set>
+          <set token="dd_level">*</set>
+          <set token="dd_component">*</set>
+          <set token="dd_earliest">$global_time.earliest$</set>
+          <set token="dd_latest">$global_time.latest$</set>
+          <set token="show_detail_chart">true</set>
+          <set token="show_detail_table">true</set>
+          <unset token="form.hide_chart" />
+          <unset token="hide_chart" />
+          <unset token="form.hide_table" />
+          <unset token="hide_table" />
+          <set token="show_detail">true</set>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>ERROR events</title>
+        <search base="overview_counts">
+          <query>fields Errors</query>
+        </search>
+        <option name="field">Errors</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="useThousandSeparators">true</option>
+        <option name="underLabel">Click to show matching events below</option>
+        <drilldown>
+          <set token="dd_host">$host_filter$</set>
+          <set token="dd_level">ERROR</set>
+          <set token="dd_component">*</set>
+          <set token="dd_earliest">$global_time.earliest$</set>
+          <set token="dd_latest">$global_time.latest$</set>
+          <set token="show_detail_chart">true</set>
+          <set token="show_detail_table">true</set>
+          <unset token="form.hide_chart" />
+          <unset token="hide_chart" />
+          <unset token="form.hide_table" />
+          <unset token="hide_table" />
+          <set token="show_detail">true</set>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>WARN events</title>
+        <search base="overview_counts">
+          <query>fields Warnings</query>
+        </search>
+        <option name="field">Warnings</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="useThousandSeparators">true</option>
+        <option name="underLabel">Click to show matching events below</option>
+        <drilldown>
+          <set token="dd_host">$host_filter$</set>
+          <set token="dd_level">WARN</set>
+          <set token="dd_component">*</set>
+          <set token="dd_earliest">$global_time.earliest$</set>
+          <set token="dd_latest">$global_time.latest$</set>
+          <set token="show_detail_chart">true</set>
+          <set token="show_detail_table">true</set>
+          <unset token="form.hide_chart" />
+          <unset token="hide_chart" />
+          <unset token="form.hide_table" />
+          <unset token="hide_table" />
+          <set token="show_detail">true</set>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+  <!-- EXAMPLE 2: Use the clicked SERIES and actual bucket bounds.
+       There is deliberately no selection handler: chart initialization and
+       range resets can emit selection events without an intentional click.
+       A legend click has no click.name value, so only _time clicks match.
+       Auto-sized buckets avoid fixing a span that becomes unsuitable for
+       a much shorter or longer time picker selection. -->
+  <row>
+    <panel>
+      <chart>
+        <title>Log levels over time - click a point to expand details</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd host=$host_filter|s$
+| eval log_level=coalesce(log_level,"UNKNOWN")
+| timechart bins=60 count BY log_level limit=0 useother=f usenull=f</query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.showMarkers">true</option>
+        <option name="charting.chart.nullValueMode">zero</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.axisTitleY.text">Events</option>
+        <option name="charting.fieldColors">{"INFO":0x2563eb,"WARN":0xd97706,"ERROR":0xdc2626,"FATAL":0x7f1d1d,"DEBUG":0x64748b}</option>
+        <option name="height">300</option>
+        <drilldown>
+          <condition match="'click.name' == &quot;_time&quot;">
+            <set token="dd_host">$host_filter$</set>
+            <set token="dd_level">$click.name2$</set>
+            <set token="dd_component">*</set>
+            <set token="dd_earliest">$earliest$</set>
+            <set token="dd_latest">$latest$</set>
+            <set token="show_detail_chart">true</set>
+            <set token="show_detail_table">true</set>
+            <unset token="form.hide_chart" />
+            <unset token="hide_chart" />
+            <unset token="form.hide_table" />
+            <unset token="hide_table" />
+            <set token="show_detail">true</set>
+          </condition>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row depends="$show_detail$,$show_detail_chart$">
+    <panel id="detail_chart_panel">
+      <input type="link" token="hide_chart" id="hide_chart_control" searchWhenChanged="true">
+        <label />
+        <choice value="hide">Hide chart</choice>
+        <selectFirstChoice>false</selectFirstChoice>
+        <change>
+          <condition value="hide">
+            <unset token="show_detail_chart" />
+          </condition>
+        </change>
+      </input>
+      <chart>
+        <title>Drilldown timechart - selected time bucket and filters</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd host=$dd_host|s$
+| eval log_level=coalesce(log_level,"UNKNOWN"), component=coalesce(component,"UNKNOWN")
+| search log_level=$dd_level|s$ component=$dd_component|s$
+| timechart bins=40 count AS Events</query>
+          <earliest>$dd_earliest$</earliest>
+          <latest>$dd_latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.axisTitleY.text">Events</option>
+        <option name="height">180</option>
+      </chart>
+    </panel>
+  </row>
+  <row depends="$show_detail$,$show_detail_table$">
+    <panel id="detail_table_panel">
+      <input type="link" token="hide_table" id="hide_table_control" searchWhenChanged="true">
+        <label />
+        <choice value="hide">Hide table</choice>
+        <selectFirstChoice>false</selectFirstChoice>
+        <change>
+          <condition value="hide">
+            <unset token="show_detail_table" />
+          </condition>
+        </change>
+      </input>
+      <table>
+        <title>Drilldown table - latest 100 matching events</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd host=$dd_host|s$
+| eval log_level=coalesce(log_level,"UNKNOWN"), component=coalesce(component,"UNKNOWN")
+| search log_level=$dd_level|s$ component=$dd_component|s$
+| sort 100 - _time
+| table _time host log_level component _raw</query>
+          <earliest>$dd_earliest$</earliest>
+          <latest>$dd_latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row depends="$show_detail$,$show_detail_table$">
+    <panel>
+      <!-- EXAMPLE 6: Build a quoted SPL string, then URL-encode the whole
+           string when linking. This preserves spaces, ampersands and quotes.
+           The link deliberately omits stats so Search displays raw events. -->
+      <single>
+        <title>Matching events - click for all results in Search</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd host=$dd_host|s$
+| eval log_level=coalesce(log_level,"UNKNOWN"), component=coalesce(component,"UNKNOWN")
+| search log_level=$dd_level|s$ component=$dd_component|s$
+| stats count AS Events</query>
+          <earliest>$dd_earliest$</earliest>
+          <latest>$dd_latest$</latest>
+          <done>
+            <set token="detail_query">search index=_internal sourcetype=splunkd host=$dd_host|s$
+| eval log_level=coalesce(log_level,"UNKNOWN"), component=coalesce(component,"UNKNOWN")
+| search log_level=$dd_level|s$ component=$dd_component|s$</set>
+          </done>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="useThousandSeparators">true</option>
+        <option name="underLabel">Open this selection in Search</option>
+        <drilldown>
+          <link target="_blank">search?q=$detail_query|u$&amp;earliest=$dd_earliest|u$&amp;latest=$dd_latest|u$</link>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <!-- EXAMPLE 4: The row host is used regardless of the clicked column. -->
+      <table>
+        <title>Hosts - click anywhere in a row</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd host=$host_filter|s$
+| stats count AS Events count(eval(log_level="ERROR")) AS Errors count(eval(log_level="WARN")) AS Warnings BY host
+| sort 20 - Events</query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="count">10</option>
+        <option name="rowNumbers">true</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="dd_host">$row.host$</set>
+          <set token="dd_level">*</set>
+          <set token="dd_component">*</set>
+          <set token="dd_earliest">$global_time.earliest$</set>
+          <set token="dd_latest">$global_time.latest$</set>
+          <set token="show_detail_chart">true</set>
+          <set token="show_detail_table">true</set>
+          <unset token="form.hide_chart" />
+          <unset token="hide_chart" />
+          <unset token="form.hide_table" />
+          <unset token="hide_table" />
+          <set token="show_detail">true</set>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <!-- EXAMPLE 5: Cell conditions choose severity. The component always
+           comes from row.component, not the numeric clicked cell value. -->
+      <table>
+        <title>Components - Errors / Warnings cells filter by level</title>
+        <search>
+          <query>index=_internal sourcetype=splunkd host=$host_filter|s$
+| eval component=coalesce(component,"UNKNOWN")
+| stats count AS Events count(eval(log_level="ERROR")) AS Errors count(eval(log_level="WARN")) AS Warnings BY component
+| sort 20 -Errors -Warnings -Events</query>
+          <earliest>$global_time.earliest$</earliest>
+          <latest>$global_time.latest$</latest>
+        </search>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <condition field="Errors">
+            <set token="dd_host">$host_filter$</set>
+            <set token="dd_level">ERROR</set>
+            <set token="dd_component">$row.component$</set>
+            <set token="dd_earliest">$global_time.earliest$</set>
+            <set token="dd_latest">$global_time.latest$</set>
+            <set token="show_detail_chart">true</set>
+            <set token="show_detail_table">true</set>
+            <unset token="form.hide_chart" />
+            <unset token="hide_chart" />
+            <unset token="form.hide_table" />
+            <unset token="hide_table" />
+            <set token="show_detail">true</set>
+          </condition>
+          <condition field="Warnings">
+            <set token="dd_host">$host_filter$</set>
+            <set token="dd_level">WARN</set>
+            <set token="dd_component">$row.component$</set>
+            <set token="dd_earliest">$global_time.earliest$</set>
+            <set token="dd_latest">$global_time.latest$</set>
+            <set token="show_detail_chart">true</set>
+            <set token="show_detail_table">true</set>
+            <unset token="form.hide_chart" />
+            <unset token="hide_chart" />
+            <unset token="form.hide_table" />
+            <unset token="hide_table" />
+            <set token="show_detail">true</set>
+          </condition>
+          <condition field="*">
+            <set token="dd_host">$host_filter$</set>
+            <set token="dd_level">*</set>
+            <set token="dd_component">$row.component$</set>
+            <set token="dd_earliest">$global_time.earliest$</set>
+            <set token="dd_latest">$global_time.latest$</set>
+            <set token="show_detail_chart">true</set>
+            <set token="show_detail_table">true</set>
+            <unset token="form.hide_chart" />
+            <unset token="hide_chart" />
+            <unset token="form.hide_table" />
+            <unset token="hide_table" />
+            <set token="show_detail">true</set>
+          </condition>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>
