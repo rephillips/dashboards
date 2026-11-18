@@ -20,9 +20,7 @@
       <fieldForLabel>host</fieldForLabel>
       <fieldForValue>host</fieldForValue>
       <search>
-        <query>| rest splunk_server=local /services/shcluster/captain/members
-| table label
-| rename label as host</query>
+        <query>| rest splunk_server=local /services/shcluster/status | fields peers.*.label | table peers.*.label | transpose | rename "row 1" as host | table host</query>
         <earliest>-24h@h</earliest>
         <latest>now</latest>
       </search>
