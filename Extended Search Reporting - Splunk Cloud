@@ -177,7 +177,7 @@
 | eval timesearched = round((search_lt-search_et),0)
 | fields savedsearch_name, timesearched, user
 | join savedsearch_name 
-    [| rest splunk_server=$captain$ "/servicesNS/-/-/saved/searches/" search="is_scheduled=1" search="disabled=0" 
+    [| rest splunk_server=local "/servicesNS/-/-/saved/searches/" search="is_scheduled=1" search="disabled=0" 
     | fields title, cron_schedule, eai:acl.app
     | rename title as savedsearch_name 
     | eval pieces=split(cron_schedule, " ") 
@@ -375,12 +375,12 @@
       </input>
       <chart>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain$ search="is_scheduled=1" search="disabled=0" earliest_time=$time_range_all.earliest$ latest_time=$time_range_all.latest$ timeout=0
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=local search="is_scheduled=1" search="disabled=0" earliest_time=$time_range_all.earliest$ latest_time=$time_range_all.latest$ timeout=0
           | table title cron_schedule scheduled_times 
           | mvexpand scheduled_times 
           | rename scheduled_times as _time 
           | timechart span=$timespan_all$ count as "Searches Scheduled"
-          | join splunk_server [| rest splunk_server=$captain$ "/services/server/status/limits/search-concurrency?cluster_wide_quota=1"
+          | join splunk_server [| rest splunk_server=local "/services/server/status/limits/search-concurrency?cluster_wide_quota=1"
               | stats max(max_hist_scheduled_searches) as max_clusterwide_scheduler_concurrency]</query>
           <earliest>$time_range_all.earliest$</earliest>
           <latest>$time_range_all.latest$</latest>
@@ -447,7 +447,7 @@
       </input>
       <chart>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain$ search="is_scheduled=1" search="disabled=0" earliest_time=$time_range_app.earliest$ latest_time=$time_range_app.latest$ timeout=0
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=local search="is_scheduled=1" search="disabled=0" earliest_time=$time_range_app.earliest$ latest_time=$time_range_app.latest$ timeout=0
 | table title cron_schedule scheduled_times eai:acl.app 
 | mvexpand scheduled_times 
 | rename scheduled_times as _time 
@@ -532,7 +532,7 @@
       </input>
       <chart>
         <search>
-          <query>| rest /servicesNS/-/-/saved/searches splunk_server=$captain$ search="is_scheduled=1" search="disabled=0" earliest_time=$time_range_user.earliest$ latest_time=$time_range_user.latest$ timeout=0
+          <query>| rest /servicesNS/-/-/saved/searches splunk_server=local search="is_scheduled=1" search="disabled=0" earliest_time=$time_range_user.earliest$ latest_time=$time_range_user.latest$ timeout=0
 | table title cron_schedule scheduled_times eai:acl.owner 
 | mvexpand scheduled_times 
 | rename scheduled_times as _time 
@@ -611,7 +611,7 @@
       </input>
       <table>
         <search>
-          <query>| rest splunk_server=$captain$ "/servicesNS/-/-/saved/searches/" search="is_scheduled=1" search="disabled=0"
+          <query>| rest splunk_server=local "/servicesNS/-/-/saved/searches/" search="is_scheduled=1" search="disabled=0"
 | fields title, eai:acl.app, eai:acl.owner, cron_schedule, dispatch.earliest_time, dispatch.latest_time, schedule_window, actions
 | rename title as "Report_Name", cron_schedule as "Cron_Schedule"
 | eval Frequency=if(like(Cron_Schedule,"*/1 %"),"1min",if(like(Cron_Schedule,"* * * * *"),"1min",if(like(Cron_Schedule,"%/5 %"),"5min", if(like(Cron_Schedule,"%/10 %"),"10min",if(like(Cron_Schedule,"*/15 %"),"15min",if(like(Cron_Schedule,"0 %"),"Top of the Hour","other"))))))
